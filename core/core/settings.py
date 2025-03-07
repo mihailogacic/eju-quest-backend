@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'storages',
+    'corsheaders',
 
     # Custom apps
     'authentication',
@@ -239,3 +241,6 @@ LOGGING = {
         },
     },
 }
+
+# Authentification
+AUTH_USER_MODEL = 'authentication.User'
