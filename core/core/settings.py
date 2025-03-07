@@ -12,8 +12,12 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+import base64
 import dj_database_url
+import json
+import logging
 from dotenv import load_dotenv
+from google.oauth2 import service_account
 
 load_dotenv()
 
@@ -30,8 +34,14 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
 
-ALLOWED_HOSTS = []
+FRONTEND_URL = os.getenv('FRONTEND_URL')
+BACKEND_URL = os.getenv('BACKEND_URL')
 
+ALLOWED_HOSTS = [BACKEND_URL, FRONTEND_URL, '127.0.0.1']
+
+CSRF_TRUSTED_ORIGINS = [ BACKEND_URL, FRONTEND_URL ]
+CORS_ALLOWED_ORIGINS = [ BACKEND_URL, FRONTEND_URL ]
+CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
 
@@ -155,4 +165,77 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+}
+
+# GOOGLE CLOUD
+google_credentials_path = os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")
+google_credentials_base64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+
+try:
+    if google_credentials_path and os.path.exists(google_credentials_path):
+        # Use the credentials file if it exists
+        with open(google_credentials_path, "r", encoding="utf-8") as f:
+            google_credentials_info = json.load(f)
+    elif google_credentials_base64:
+        # Decode the Base64 string into JSON
+        google_credentials_info = json.loads(
+            base64.b64decode(google_credentials_base64).decode("utf-8")
+        )
+    else:
+        raise ValueError("Google Cloud credentials not provided.")
+
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(
+        google_credentials_info
+    )
+
+except Exception as e:
+    logging.error("Error loading Google Cloud credentials: %s", e)
+    raise
+print(GS_CREDENTIALS)
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
+            "bucket_name": os.getenv("G_CLOUD_BUCKET_NAME_MEDIA"),
+            "credentials": GS_CREDENTIALS,
+        },
+    },
+    "staticfiles": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
+            "bucket_name": os.getenv("G_CLOUD_BUCKET_NAME_STATIC"),
+            "credentials": GS_CREDENTIALS,
+        },
+    },
+}
+
+# EMAIL
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'glydr.log',
+        },
+    },
+    'loggers': {
+        'authentication': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
 }
