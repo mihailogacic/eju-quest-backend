@@ -228,7 +228,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': 'glydr.log',
+            'filename': 'ejuquest.log',
         },
     },
     'loggers': {
