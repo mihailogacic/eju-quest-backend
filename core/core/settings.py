@@ -12,10 +12,12 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
-import json
+import base64
 import dj_database_url
-from dotenv import load_dotenv
+import json
+import logging
 from datetime import timedelta
+from dotenv import load_dotenv
 from google.oauth2 import service_account
 
 load_dotenv()
@@ -33,8 +35,15 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
 
-ALLOWED_HOSTS = []
+FRONTEND_URL = os.getenv('FRONTEND_URL')
+BACKEND_URL = os.getenv('BACKEND_URL')
+_ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS')
 
+ALLOWED_HOSTS = [_ALLOWED_HOSTS]
+
+CSRF_TRUSTED_ORIGINS = [BACKEND_URL, FRONTEND_URL]
+CORS_ALLOWED_ORIGINS = [BACKEND_URL, FRONTEND_URL]
+CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
 
@@ -49,11 +58,12 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'storages',
+    'corsheaders',
 
     # Custom apps
     'authentication',
     'lessons',
-    'quiz',
 ]
 
 MIDDLEWARE = [
@@ -142,38 +152,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = '/static/'
-google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
-if google_credentials_json:
-    credentials_info = json.loads(google_credentials_json)
-    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(
-        credentials_info)
-else:
-    raise Exception(
-        "Google Cloud credentials path is not set in the environment.")
-
-STORAGES = {
-    # FOR MEDIA FILES
-    "default": {
-        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-        "OPTIONS": {
-            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
-            "bucket_name": os.getenv("G_CLOUD_BUCEKT_NAME_MEDIA"),
-            "file_overwrite": False,
-            "credentials": GS_CREDENTIALS,
-            "expiration": timedelta(seconds=120)
-        },
-    },
-    # FOR STATIC FILES
-    "staticfiles": {
-        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-        "OPTIONS": {
-            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
-            # Use a different bucket for static files
-            "bucket_name": os.getenv("G_CLOUD_BUCEKT_NAME_STATIC"),
-            "credentials": GS_CREDENTIALS,
-        },
-    },
-}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -188,12 +166,82 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
 
-# EMAIL CONFIGURATION
+# GOOGLE CLOUD
+google_credentials_path = os.getenv("GOOGLE_CREDENTIALS_JSON_PATH")
+google_credentials_base64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+
+try:
+    if google_credentials_path and os.path.exists(google_credentials_path):
+        # Use the credentials file if it exists
+        with open(google_credentials_path, "r", encoding="utf-8") as f:
+            google_credentials_info = json.load(f)
+    elif google_credentials_base64:
+        # Decode the Base64 string into JSON
+        google_credentials_info = json.loads(
+            base64.b64decode(google_credentials_base64).decode("utf-8")
+        )
+    else:
+        raise ValueError("Google Cloud credentials not provided.")
+
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(
+        google_credentials_info
+    )
+
+except Exception as e:
+    logging.error("Error loading Google Cloud credentials: %s", e)
+    raise
+
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
+            "bucket_name": os.getenv("G_CLOUD_BUCKET_NAME_MEDIA"),
+            "credentials": GS_CREDENTIALS,
+        },
+    },
+    "staticfiles": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
+            "bucket_name": os.getenv("G_CLOUD_BUCKET_NAME_STATIC"),
+            "credentials": GS_CREDENTIALS,
+        },
+    },
+}
+
+# EMAIL
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_USE_TLS = True
 EMAIL_PORT = 587
+EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'ejuquest.log',
+        },
+    },
+    'loggers': {
+        'authentication': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+
+# Authentification
+AUTH_USER_MODEL = 'authentication.User'
