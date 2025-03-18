@@ -39,7 +39,11 @@ class GenerateNewLessonView(APIView):
                 serializer.validated_data)
             print(lesson)
 
-            return Response(lesson, status=status.HTTP_200_OK)
+            return Response({"lesson": lesson, "prompt_input": {
+                "age_level": serializer.validated_data.get('age_level'),
+                "title": serializer.validated_data.get('title'),
+                "lesson_length": serializer.validated_data.get('lesson_length')
+            }}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -48,23 +52,23 @@ class SaveLessonContentView(APIView):
     """
     API view to save lesson content along with its sections and quiz data.
 
-    Expects a JSON payload with the following structure:
+    This view will:
+      - Create a Lesson instance.
+      - Create Sections from the "content" list.
+      - Create a Quiz for the Lesson.
+      - For each question:
+        - Create multiple QuizQuestionOptions.
+        - Link all options to the corresponding QuizQuestions instance.
 
+    Expected JSON Format:
     {
         "content": [
-            {
-                "heading": "Introduction to Crypto Trading",
-                "text": "Crypto trading involves buying and selling..."
-            },
-            {
-                "heading": "History of Cryptocurrencies",
-                "text": "Cryptocurrencies began in 2009 with the creation of Bitcoin..."
-            },
+            {"heading": "Introduction", "text": "Some text"},
             ...
         ],
         "questions": [
             {
-                "question": "Who is credited with creating Bitcoin?",
+                "question": "Who created Bitcoin?",
                 "options": [
                     {"option": "A", "text": "Vitalik Buterin"},
                     {"option": "B", "text": "Satoshi Nakamoto"},
@@ -76,13 +80,6 @@ class SaveLessonContentView(APIView):
             ...
         ]
     }
-
-    The view will:
-      - Create a Lesson instance (using the first section's heading as the lesson title if none is provided).
-      - Create a Section for each item in the "content" list.
-      - Create a Quiz for the Lesson.
-      - For each question, create a QuizQuestions instance and create all QuizQuestionOptions.
-        Due to the models’ design, the QuizQuestions.options field will be linked to the correct option.
     """
 
     def post(self, request, *args, **kwargs):
@@ -95,52 +92,45 @@ class SaveLessonContentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Determine lesson title (use provided title if available, or use the first section's heading)
-        lesson_title = data.get("title")
-        if not lesson_title:
-            if data["content"]:
-                lesson_title = data["content"][0].get(
-                    "heading", "Untitled Lesson")
-            else:
-                lesson_title = "Untitled Lesson"
+        # Determine lesson title (use provided title or fallback to first section heading)
+        lesson_title = data.get("title") or (data["content"][0].get(
+            "heading") if data["content"] else "Untitled Lesson")
 
         # Create the Lesson instance
-        # Here we use default values for age_level and lesson_length for simplicity.
-        # You might want to extract these from data if available.
         lesson = Lesson.objects.create(
             creator=request.user,
             title=lesson_title,
-            age_level=10,            # default value; adjust as needed
-            lesson_length="medium",  # default value; adjust as needed
+            # Default value; can be adjusted
+            age_level=data.get('age_level'),
+            # Default value; can be adjusted
+            lesson_length=data.get('lesson_length'),
             status="pending"
         )
 
-        # Create Sections from the content data
+        # Create Sections from content data
         for section in data["content"]:
             heading = section.get("heading", "")
             text = section.get("text", "")
             if heading and text:
                 Sections.objects.create(
-                    lesson=lesson,
-                    heading=heading,
-                    content=text
-                )
+                    lesson=lesson, heading=heading, content=text)
 
         # Create a Quiz for the lesson
         quiz = Quiz.objects.create(lesson=lesson)
 
-        # Process each question in the quiz data
+        # Process each question
         for question_data in data["questions"]:
             question_text = question_data.get("question", "")
             options_data = question_data.get("options", [])
             correct_answer = question_data.get("answer", "")
 
             created_options = []
-            # Create QuizQuestionOptions for each provided option
+            # Create all options and determine which is correct
             for option_data in options_data:
                 option_letter = option_data.get("option")
                 option_text = option_data.get("text")
                 is_correct = (option_letter == correct_answer)
+
                 quiz_option = QuizQuestionOptions.objects.create(
                     option=option_letter,
                     option_text=option_text,
@@ -148,21 +138,13 @@ class SaveLessonContentView(APIView):
                 )
                 created_options.append(quiz_option)
 
-            # From the created options, pick the correct one to link in the QuizQuestions instance.
-            correct_option_instance = next(
-                (opt for opt in created_options if opt.option == correct_answer), None)
-            if not correct_option_instance:
-                return Response(
-                    {"detail": f"Correct option not found for question: {question_text}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Create the quiz question and assign the correct option.
-            QuizQuestions.objects.create(
+            # Create the quiz question and associate all options
+            quiz_question = QuizQuestions.objects.create(
                 quiz=quiz,
-                question_text=question_text,
-                options=correct_option_instance
+                question_text=question_text
             )
+            quiz_question.options.set(created_options)  # Associate all options
+            quiz_question.save()
 
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
 
