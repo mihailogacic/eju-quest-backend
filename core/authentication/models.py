@@ -1,19 +1,22 @@
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+"""Models for custom user authentication and related activities."""
+
+import random
+import uuid
+from datetime import timedelta
+
+from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
+from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 from django.utils.timezone import now
-from django.conf import settings
-import uuid
-import random
-from datetime import timedelta
 
 
 class UserManager(BaseUserManager):
-    """Custom user manager for handling user creation."""
+    """Custom user manager handling user creation."""
 
     def _create_user(self, email, password=None, role='parent', **extra_fields):
-        """Helper method to create a user with validated fields."""
+        """Create and save a user with given email and password."""
         if not email:
-            raise ValueError("Email is required")
+            raise ValueError('Email is required.')
 
         email = self.normalize_email(email)
         user = self.model(email=email, role=role, **extra_fields)
@@ -41,7 +44,7 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    """Custom user model with Parent & Child roles."""
+    """Custom user model supporting Parent and Child roles."""
 
     ROLE_CHOICES = [
         ('parent', 'Parent'),
@@ -51,49 +54,44 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, db_index=True)
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
-    role = models.CharField(
-        max_length=10, choices=ROLE_CHOICES, default='parent')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='parent')
     accepted_terms_date = models.DateTimeField(null=True, blank=True)
-
     parent = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
-
-    # Will be set to True after email confirmation
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
+    )
     is_verified = models.BooleanField(default=False)
     last_login_ip = models.GenericIPAddressField(blank=True, null=True)
-
-    # New field for email confirmation token:
     email_confirmation_token = models.UUIDField(
-        default=uuid.uuid4, unique=True, null=True, blank=True)
-
+        default=uuid.uuid4, unique=True, null=True, blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
-
-    # Note: For parent accounts, is_active will be False until the email is confirmed.
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['']
+    REQUIRED_FIELDS = []
 
     def __str__(self):
+        """Return a string representation of the user."""
         return f"{self.email} ({self.role})"
 
     def has_children(self):
-        """Check if a parent has registered child accounts."""
+        """Check if a user has child accounts."""
+        # pylint: disable=no-member
         return self.children.exists()
 
     def delete_user(self):
-        """Soft delete the user account."""
+        """Soft delete a user by marking inactive and setting deletion time."""
         self.deleted_at = now()
         self.is_active = False
         self.save()
 
 
 class OTP(models.Model):
-    """Model for storing OTP codes for authentication and password reset."""
+    """Model for OTP codes for authentication and password resets."""
 
     OTP_PURPOSES = [
         ('registration', 'Registration'),
@@ -101,8 +99,7 @@ class OTP(models.Model):
         ('password_reset', 'Password Reset'),
     ]
 
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="otps")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otps')
     otp_code = models.CharField(max_length=6)
     purpose = models.CharField(max_length=20, choices=OTP_PURPOSES)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -111,45 +108,52 @@ class OTP(models.Model):
     attempts = models.PositiveIntegerField(default=0)
 
     def save(self, *args, **kwargs):
-        """Auto-set expiry time and generate OTP."""
+        """Generate OTP and set expiry if not already set."""
         if not self.otp_code:
-            self.otp_code = f"{random.randint(100000, 999999)}"
+            self.otp_code = str(random.randint(100000, 999999))
         if not self.expires_at:
             self.expires_at = now() + timedelta(minutes=10)
         super().save(*args, **kwargs)
 
     def is_expired(self):
+        """Check if the OTP has expired."""
         return now() > self.expires_at
 
     def __str__(self):
-        return f"OTP for {self.user.email} - {self.purpose}"
+        """Return a string representation of the OTP instance."""
+        # pylint: disable=no-member
+        return f"OTP ({self.purpose}) for {self.user.email}"
 
 
 class UserActivityLog(models.Model):
-    """Logs user login attempts and activity."""
+    """Model logging user activity events like login/logout."""
 
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="activity_logs")
+    EVENT_CHOICES = [
+        ('login', 'Login'),
+        ('logout', 'Logout'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')
     ip_address = models.GenericIPAddressField()
-    event_type = models.CharField(max_length=50, choices=[
-                                  ('login', 'Login'), ('logout', 'Logout')])
+    event_type = models.CharField(max_length=50, choices=EVENT_CHOICES)
     event_time = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
+        """Return string representation of user activity log entry."""
+        # pylint: disable=no-member
         return f"{self.user.email} - {self.event_type} at {self.event_time}"
 
 
 class SecurityLog(models.Model):
-    """Stores security-related logs for failed logins and password resets."""
+    """Model storing logs related to security incidents."""
 
     EVENT_TYPES = [
-        ("failed_login", "Failed Login"),
-        ("otp_abuse", "Multiple OTP Failures"),
-        ("password_reset_fail", "Failed Password Reset Attempt"),
+        ('failed_login', 'Failed Login'),
+        ('otp_abuse', 'Multiple OTP Failures'),
+        ('password_reset_fail', 'Failed Password Reset Attempt'),
     ]
 
-    user = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
     ip_address = models.GenericIPAddressField()
     event_type = models.CharField(max_length=50, choices=EVENT_TYPES)
@@ -158,14 +162,15 @@ class SecurityLog(models.Model):
     failed_attempts = models.PositiveIntegerField(default=0)
 
     def increment_failed_attempts(self):
-        """Increments failed login attempts."""
+        """Increment the count of failed attempts."""
         self.failed_attempts += 1
         self.save()
 
     def reset_failed_attempts(self):
-        """Resets failed login attempts counter."""
+        """Reset the count of failed attempts to zero."""
         self.failed_attempts = 0
         self.save()
 
     def __str__(self):
-        return f"Security Event: {self.event_type} - {self.event_time}"
+        """Return string representation of a security log entry."""
+        return f"{self.event_type} at {self.event_time}"
