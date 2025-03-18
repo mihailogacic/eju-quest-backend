@@ -170,8 +170,14 @@ class LessonApi(APIView):
     pass
 
 
-class ApproveLesson(APIView):
-    pass
+class ApproveLessonView(APIView):
+    def post(self, request):
+        data = request.data
+        lesson_id = data.get('lesson_id')
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        lesson.status = 'approved'
+        lesson.save()
+        return Response({'detail':  "Lesson has been successfully approved."}, status=status.HTTP_200_OK)
 
 
 class UnapproveLessonView(APIView):

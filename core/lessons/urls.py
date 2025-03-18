@@ -15,5 +15,6 @@ urlpatterns = [
     path('summary/', views.LessonSummaryView.as_view(),
          name='save-lesson-summary'),
     path('unapprove/', views.UnapproveLessonView.as_view(),
-         name='unapprove-lesson')
+         name='unapprove-lesson'),
+    path('approve/', views.ApproveLessonView.as_view(), name='approve-lesson')
 ]
