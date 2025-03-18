@@ -7,9 +7,10 @@ import logging
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 
 
-from .serializers import LessonSerializer
+from .serializers import LessonSerializer, QuizSerializer
 from .services import LessonServices
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
 
@@ -148,10 +149,31 @@ class SaveLessonContentView(APIView):
 
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
 
+class LessonAPI(APIView):
+    """
+    API view to retrieve lessons with optional filtering by status.
 
-class LessonApi(APIView):
-    pass
+    If a query parameter "status" is provided, only lessons with that status
+    (case-insensitive) will be returned.
+    """
 
+    def get(self, request, format=None):
+        """
+        Retrieve all lessons or filter by lesson status if provided.
+
+        Query Parameters:
+            status (str, optional): The lesson status to filter by (e.g., "pending").
+
+        Returns:
+            Response: A response object containing serialized lesson data.
+        """
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            lessons = Lesson.objects.filter(status__iexact=status_filter)
+        else:
+            lessons = Lesson.objects.all()
+        serializer = LessonSerializer(lessons, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class ApproveLesson(APIView):
     pass
@@ -161,5 +183,68 @@ class UnapproveLesson(APIView):
     pass
 
 
-class QuizApi(APIView):
-    pass
+class QuizAPI(APIView):
+    """
+    API view to handle quiz submission and retrieval.
+
+    This view provides endpoints to submit a new quiz and retrieve an existing quiz.
+    It adheres to the principles of simplicity and readability as stated in PEP 8, PEP 257,
+    and PEP 20.
+    """
+
+    def get(self, request, lesson, format=None):
+        """
+        Retrieve an existing quiz by its ID.
+
+        Args:
+            request (HttpRequest): The HTTP request instance.
+            quiz_id (int): The primary key of the quiz to retrieve.
+            format (str, optional): Format suffix for content negotiation.
+
+        Returns:
+            Response: A response object containing the quiz data if found,
+                      otherwise an error message with status 404.
+        """
+        quiz = get_object_or_404(Quiz, lesson=lesson)
+        serializer = QuizSerializer(quiz)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, format=None):
+        """
+        Submit a new quiz.
+
+        This method creates a new quiz instance along with its related quiz questions and options
+        (if provided). It restricts users from creating more than one quiz per lesson.
+        
+        Args:
+            request (HttpRequest): The HTTP request containing quiz data.
+            format (str, optional): Format suffix for content negotiation.
+
+        Returns:
+            Response: A response object containing the created quiz data with status 201 if successful,
+                    or validation errors with status 400.
+        """
+        # Extract lesson ID from input data.
+        lesson_id = request.data.get("lesson")
+        if not lesson_id:
+            return Response(
+                {"lesson": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if a quiz already exists for the given lesson.
+        if Quiz.objects.filter(lesson_id=lesson_id).exists():
+            return Response(
+                {"detail": "Quiz already exists for this lesson."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Process quiz creation.
+        serializer = QuizSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            quiz = serializer.save()
+            return Response(
+                QuizSerializer(quiz, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

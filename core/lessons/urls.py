@@ -8,8 +8,13 @@ from . import views
 
 
 urlpatterns = [
+    # lesson
     path('generate-new-lesson/', views.GenerateNewLessonView.as_view(),
          name='generate-new-lesson'),
+    path('list/', views.LessonAPI.as_view(), name='pending-lessons'),
 
-    path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson')
+    # quiz
+    path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
+    path('submit-quiz/', views.QuizAPI.as_view(), name='quiz-submit'),
+    path('quiz/<int:lesson>/', views.QuizAPI.as_view(), name='quiz-detail'),
 ]

@@ -5,7 +5,7 @@ of data that comes to the backend from frontend.
 
 from rest_framework import serializers
 from core.exceptions import CustomValidationException
-from .models import Lesson
+from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonSummary
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -86,57 +86,63 @@ class LessonSerializer(serializers.ModelSerializer):
             validated_data['creator'] = request.user
         return super().create(validated_data)
 
-# class SectionSerializer(serializers.ModelSerializer):
-#     """
-#     Serializer for Sections model.
-#     """
-#     lesson = serializers.PrimaryKeyRelatedField(queryset=Lesson.objects.all())
+class SectionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Sections model.
+    """
+    lesson = serializers.PrimaryKeyRelatedField(queryset=Lesson.objects.all())
 
-#     class Meta:
-#         model = Sections
-#         fields = ['id', 'lesson', 'heading', 'content']
-
-
-# class QuizQuestionOptionSerializer(serializers.ModelSerializer):
-#     """
-#     Serializer for QuizQuestionOptions model.
-#     """
-
-#     class Meta:
-#         model = QuizQuestionOptions
-#         fields = ['id', 'option', 'option_text', 'correct']
+    class Meta:
+        model = Sections
+        fields = ['id', 'lesson', 'heading', 'content']
 
 
-# class QuizQuestionSerializer(serializers.ModelSerializer):
-#     """
-#     Serializer for QuizQuestions model.
-#     """
-#     quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all())
-#     options = QuizQuestionOptionSerializer()
+class QuizQuestionOptionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for QuizQuestionOptions model.
+    """
 
-#     class Meta:
-#         model = QuizQuestions
-#         fields = ['id', 'quiz', 'question_text', 'options']
+    class Meta:
+        model = QuizQuestionOptions
+        fields = ['id', 'option', 'option_text', 'correct']
 
 
-# class QuizSerializer(serializers.ModelSerializer):
-#     """
-#     Serializer for Quiz model.
-#     """
-#     lesson = serializers.PrimaryKeyRelatedField(queryset=Lesson.objects.all())
-#     questions = QuizQuestionSerializer(many=True, read_only=True)
+class QuizQuestionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for QuizQuestions model.
+    """
+    quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all())
+    options = QuizQuestionOptionSerializer()
 
-#     class Meta:
-#         model = Quiz
-#         fields = ['id', 'lesson', 'questions']
+    class Meta:
+        model = QuizQuestions
+        fields = ['id', 'quiz', 'question_text', 'options']
 
 
-# class LessonSummarySerializer(serializers.ModelSerializer):
-#     """
-#     Serializer for LessonSummary model.
-#     """
-#     creator = serializers.StringRelatedField(read_only=True)
+class QuizSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Quiz model.
+    Accepts a lesson ID for creation and returns lesson details.
+    """
+    # Accept the lesson ID for input.
+    lesson = serializers.PrimaryKeyRelatedField(
+        queryset=Lesson.objects.all(), write_only=True
+    )
+    # Return full lesson details in the response.
+    lesson_detail = LessonSerializer(source='lesson', read_only=True)
+    questions = QuizQuestionSerializer(many=True, read_only=True)
 
-#     class Meta:
-#         model = LessonSummary
-#         fields = ['id', 'creator', 'description']
+    class Meta:
+        model = Quiz
+        fields = ['id', 'lesson', 'lesson_detail', 'questions']
+
+
+class LessonSummarySerializer(serializers.ModelSerializer):
+    """
+    Serializer for LessonSummary model.
+    """
+    creator = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = LessonSummary
+        fields = ['id', 'creator', 'description']
