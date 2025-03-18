@@ -1,3 +1,9 @@
-from django.contrib import admin
+"""
+This module is used to register database models to Django admin section
+"""
 
-# Register your models here.
+from django.contrib import admin
+from .models import Lesson, Sections, QuizQuestionOptions, Quiz, QuizQuestions, LessonSummary
+
+admin.site.register([Lesson, Sections, QuizQuestionOptions,
+                    Quiz, QuizQuestions, LessonSummary])
