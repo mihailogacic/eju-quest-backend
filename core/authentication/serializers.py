@@ -12,6 +12,7 @@ from .models import OTP
 
 User = get_user_model()
 
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Customize JWT to include user role in the token payload"""
 
@@ -21,14 +22,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role'] = user.role  # Add user role to the token
         return token
 
+
 class RegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration with proper validations and email confirmation."""
 
     confirm_password = serializers.CharField(write_only=True, min_length=8)
-    zip_code = serializers.CharField(required=True, max_length=10)
-    subscription_plan = serializers.ChoiceField(choices=[
-        ('trial', 'Trial'), ('core', 'Core'), ('advanced', 'Advanced')
-    ])
     terms_accepted = serializers.BooleanField(write_only=True)
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
@@ -37,7 +35,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'first_name', 'last_name', 'email', 'password', 'confirm_password',
-            'role', 'zip_code', 'subscription_plan', 'terms_accepted'
+            'role',  'terms_accepted'
         ]
 
     def validate_email(self, value):
@@ -49,23 +47,27 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_password(self, value):
         """Check password strength."""
         if len(value) < 8 or not any(char.isdigit() for char in value) or not any(char.isalpha() for char in value) or not any(char in "!@#$%^&*()-_=+[{]}|;:',<.>/?`~" for char in value):
-            raise serializers.ValidationError("Password must be at least 8 characters long, contain a letter, a number, and a special character.")
+            raise serializers.ValidationError(
+                "Password must be at least 8 characters long, contain a letter, a number, and a special character.")
         return value
 
     def validate(self, attrs):
         """Additional validations for passwords, terms, and roles."""
         if attrs['password'] != attrs['confirm_password']:
-            raise serializers.ValidationError({"password": "Passwords do not match."})
-        
+            raise serializers.ValidationError(
+                {"password": "Passwords do not match."})
+
         if not attrs.get('terms_accepted', False):
-            raise serializers.ValidationError({"terms_accepted": "Terms must be accepted to register."})
-        
+            raise serializers.ValidationError(
+                {"terms_accepted": "Terms must be accepted to register."})
+
         # Restrict children creation
         role = attrs.get('role', 'parent')
         request_user = self.context.get('request').user
         if role == 'child' and (not request_user or request_user.role != 'parent'):
-            raise serializers.ValidationError({"role": "Only a parent can create child accounts."})
-        
+            raise serializers.ValidationError(
+                {"role": "Only a parent can create child accounts."})
+
         return attrs
 
     def create(self, validated_data):
@@ -81,14 +83,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         try:
             user = User.objects.create_user(**validated_data)
         except DjangoValidationError as e:
-            raise serializers.ValidationError({"detail": "Failed to create user. Please check the input data."})
+            raise serializers.ValidationError(
+                {"detail": "Failed to create user. Please check the input data."})
 
         if user.role == 'parent':
             try:
                 self.send_confirmation_email(user)
             except Exception:
                 user.delete()  # Clean up if email fails
-                raise serializers.ValidationError({"detail": "Failed to send confirmation email. Please try again later."})
+                raise serializers.ValidationError(
+                    {"detail": "Failed to send confirmation email. Please try again later."})
 
             return {'detail': 'Registration successful. Please confirm your email.'}
         else:
@@ -110,13 +114,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             fail_silently=False,
         )
 
+
 class PasswordResetOTPRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
         user = User.objects.filter(email=value).first()
         if not user:
-            raise serializers.ValidationError("No user found with this email address.")
+            raise serializers.ValidationError(
+                "No user found with this email address.")
         return value
 
     def create(self, validated_data):
@@ -136,7 +142,8 @@ class PasswordResetOTPRequestSerializer(serializers.Serializer):
             fail_silently=False,
         )
         return otp_instance
-    
+
+
 class PasswordResetConfirmSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp_code = serializers.CharField(max_length=6)
@@ -149,13 +156,16 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if not user:
             raise serializers.ValidationError("Invalid email or OTP.")
         # Find a matching, unused OTP for password reset.
-        otp_instance = OTP.objects.filter(user=user, purpose='password_reset', otp_code=otp_code, is_used=False).last()
+        otp_instance = OTP.objects.filter(
+            user=user, purpose='password_reset', otp_code=otp_code, is_used=False).last()
         if not otp_instance:
             raise serializers.ValidationError("Invalid OTP.")
         if otp_instance.is_expired():
-            raise serializers.ValidationError("OTP has expired. Please request a new one.")
+            raise serializers.ValidationError(
+                "OTP has expired. Please request a new one.")
         if otp_instance.attempts >= 5:
-            raise serializers.ValidationError("Too many failed attempts. Please request a new OTP.")
+            raise serializers.ValidationError(
+                "Too many failed attempts. Please request a new OTP.")
         # Save the OTP instance for use in save() method.
         self.context['otp_instance'] = otp_instance
         self.context['user'] = user
@@ -172,10 +182,12 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         otp_instance.is_used = True
         otp_instance.save()
         return user
-    
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for retrieving and updating the user profile."""
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'role', 'created_at']
+        fields = ['id', 'first_name', 'last_name',
+                  'email', 'role', 'created_at']
         read_only_fields = ['id', 'email', 'role', 'created_at']

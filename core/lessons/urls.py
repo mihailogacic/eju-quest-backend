@@ -2,15 +2,12 @@
 This module contains all API endpoints for lessons API
 """
 
-from django.urls import path, include
+from django.urls import path
 
-from rest_framework.routers import DefaultRouter
+from . import views
 
-from .views import LessonsViewset
-
-router = DefaultRouter()
-router.register(r'', LessonsViewset, basename='lessons')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('generate-new-lesson/', views.GenerateNewLessonView.as_view(),
+         name='generate-new-lesson'),
 ]
