@@ -44,10 +44,10 @@ class RegisterView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         """Handle user registration."""
         serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        user_data = serializer.save()
-        # The response structure will differ depending on the role.
-        return Response(user_data, status=status.HTTP_201_CREATED)
+        if serializer.is_valid():
+            user_data = serializer.save()
+            return Response(user_data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(TokenObtainPairView):
     """API endpoint for user login."""

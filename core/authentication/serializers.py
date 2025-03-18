@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.conf import settings
 from datetime import timedelta
@@ -21,51 +22,77 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
 class RegisterSerializer(serializers.ModelSerializer):
-    """Serializer for user registration with email confirmation for parents."""
-    
-    password = serializers.CharField(write_only=True, min_length=6)
+    """Serializer for user registration with proper validations and email confirmation."""
+
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+    zip_code = serializers.CharField(required=True, max_length=10)
+    subscription_plan = serializers.ChoiceField(choices=[
+        ('trial', 'Trial'), ('core', 'Core'), ('advanced', 'Advanced')
+    ])
+    terms_accepted = serializers.BooleanField(write_only=True)
+    password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'password', 'confirm_password', 'role', 'parent']
-        extra_kwargs = {
-            'parent': {'read_only': True}  # Only set automatically for child accounts
-        }
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'password', 'confirm_password',
+            'role', 'zip_code', 'subscription_plan', 'terms_accepted'
+        ]
+
+    def validate_email(self, value):
+        """Check if email is already registered."""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email is already registered.")
+        return value
+
+    def validate_password(self, value):
+        """Check password strength."""
+        if len(value) < 8 or not any(char.isdigit() for char in value) or not any(char.isalpha() for char in value) or not any(char in "!@#$%^&*()-_=+[{]}|;:',<.>/?`~" for char in value):
+            raise serializers.ValidationError("Password must be at least 8 characters long, contain a letter, a number, and a special character.")
+        return value
 
     def validate(self, attrs):
-        """Ensure role restrictions are followed."""
-        role = attrs.get('role')
+        """Additional validations for passwords, terms, and roles."""
+        if attrs['password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"password": "Passwords do not match."})
+        
+        if not attrs.get('terms_accepted', False):
+            raise serializers.ValidationError({"terms_accepted": "Terms must be accepted to register."})
+        
+        # Restrict children creation
+        role = attrs.get('role', 'parent')
         request_user = self.context.get('request').user
-
-        if role == 'child':
-            # Ensure only parents can create child accounts.
-            if not request_user or request_user.role != 'parent':
-                raise serializers.ValidationError("Only a parent can create child accounts.")
+        if role == 'child' and (not request_user or request_user.role != 'parent'):
+            raise serializers.ValidationError({"role": "Only a parent can create child accounts."})
+        
         return attrs
 
     def create(self, validated_data):
-        """Create a new user and send a confirmation email if it's a parent."""
-        # Remove confirm_password from the validated data.
+        """Create user and handle email confirmation."""
         validated_data.pop('confirm_password')
+        validated_data.pop('terms_accepted')
         role = validated_data.get('role', 'parent')
-        request_user = self.context.get('request').user
 
-        if role == 'child' and request_user:
-            validated_data['parent'] = request_user
-        # For parent accounts, mark inactive so they must confirm their email.
-        if role == 'parent':
-            validated_data['is_active'] = False
-            validated_data['is_verified'] = False
+        validated_data['is_active'] = False if role == 'parent' else True
+        validated_data['is_verified'] = False
+        validated_data['accepted_terms_date'] = now()
 
-        user = User.objects.create_user(**validated_data)
+        try:
+            user = User.objects.create_user(**validated_data)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"detail": "Failed to create user. Please check the input data."})
 
         if user.role == 'parent':
-            self.send_confirmation_email(user)
-            return {'message': 'Registration successful. Please confirm your email.'}
+            try:
+                self.send_confirmation_email(user)
+            except Exception:
+                user.delete()  # Clean up if email fails
+                raise serializers.ValidationError({"detail": "Failed to send confirmation email. Please try again later."})
+
+            return {'detail': 'Registration successful. Please confirm your email.'}
         else:
             refresh = RefreshToken.for_user(user)
-            from .serializers import UserProfileSerializer  # Ensure this is imported without circular dependency
             return {
                 'user': UserProfileSerializer(user).data,
                 'access': str(refresh.access_token),
@@ -73,7 +100,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             }
 
     def send_confirmation_email(self, user):
-        """Send an email containing the confirmation link."""
+        """Send a confirmation email."""
         confirmation_link = f"{settings.FRONTEND_URL}/verify-email/{user.email_confirmation_token}/"
         send_mail(
             subject="Verify Your Email - EjuQuest",
@@ -150,5 +177,5 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for retrieving and updating the user profile."""
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'role', 'accepted_terms_date', 'created_at']
-        read_only_fields = ['id', 'email', 'role', 'accepted_terms_date', 'created_at']
+        fields = ['id', 'first_name', 'last_name', 'email', 'role', 'created_at']
+        read_only_fields = ['id', 'email', 'role', 'created_at']

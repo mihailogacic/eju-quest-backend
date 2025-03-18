@@ -7,40 +7,37 @@ import random
 from datetime import timedelta
 
 class UserManager(BaseUserManager):
-    """Custom manager for handling user creation."""
+    """Custom user manager for handling user creation."""
 
-    def _create_user(self, email, username, password=None, role='parent', **extra_fields):
+    def _create_user(self, email, password=None, role='parent', **extra_fields):
         """Helper method to create a user with validated fields."""
         if not email:
             raise ValueError("Email is required")
-        if not username:
-            raise ValueError("Username is required")
 
         email = self.normalize_email(email)
-        user = self.model(email=email, username=username, role=role, **extra_fields)
+        user = self.model(email=email, role=role, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_user(self, email, username, password=None, role='parent', **extra_fields):
+    def create_user(self, email, password=None, role='parent', **extra_fields):
         """Create and return a regular user."""
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
         extra_fields.setdefault('created_at', now())
-        # For parents, require email confirmation
         if role == 'parent':
             extra_fields.setdefault('is_active', False)
             extra_fields.setdefault('is_verified', False)
-        return self._create_user(email, username, password, role, **extra_fields)
+        return self._create_user(email, password, role, **extra_fields)
 
-    def create_superuser(self, email, username, password=None, **extra_fields):
+    def create_superuser(self, email, password=None, **extra_fields):
         """Create and return a superuser."""
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        # Superusers are immediately active/verified.
         extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('is_verified', True)
-        return self._create_user(email, username, password, role='parent', **extra_fields)
+        return self._create_user(email, password, role='parent', **extra_fields)
+
 
 class User(AbstractBaseUser, PermissionsMixin):
     """Custom user model with Parent & Child roles."""
@@ -54,6 +51,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='parent')
+    zip_code = models.CharField(max_length=10, null=True, blank=True)
+    subscription_plan = models.CharField(max_length=10, choices=[
+        ('trial', 'Trial'),
+        ('core', 'Core'),
+        ('advanced', 'Advanced')
+    ], default='trial')
+    accepted_terms_date = models.DateTimeField(null=True, blank=True)
     
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
     
@@ -76,7 +80,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['']
 
     def __str__(self):
-        return f"{self.username} ({self.role})"
+        return f"{self.email} ({self.role})"
 
     def has_children(self):
         """Check if a parent has registered child accounts."""
