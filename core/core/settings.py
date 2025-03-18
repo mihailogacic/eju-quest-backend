@@ -12,8 +12,11 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+import json
 import dj_database_url
 from dotenv import load_dotenv
+from datetime import timedelta
+from google.oauth2 import service_account
 
 load_dotenv()
 
@@ -51,8 +54,6 @@ INSTALLED_APPS = [
     'authentication',
     'lessons',
     'quiz',
-    'rewards',
-    'tracking',
 ]
 
 MIDDLEWARE = [
@@ -140,7 +141,39 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+if google_credentials_json:
+    credentials_info = json.loads(google_credentials_json)
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(
+        credentials_info)
+else:
+    raise Exception(
+        "Google Cloud credentials path is not set in the environment.")
+
+STORAGES = {
+    # FOR MEDIA FILES
+    "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
+            "bucket_name": os.getenv("G_CLOUD_BUCEKT_NAME_MEDIA"),
+            "file_overwrite": False,
+            "credentials": GS_CREDENTIALS,
+            "expiration": timedelta(seconds=120)
+        },
+    },
+    # FOR STATIC FILES
+    "staticfiles": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": os.getenv("G_CLOUD_PROJECT_ID"),
+            # Use a different bucket for static files
+            "bucket_name": os.getenv("G_CLOUD_BUCEKT_NAME_STATIC"),
+            "credentials": GS_CREDENTIALS,
+        },
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -156,3 +189,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
 }
+
+# EMAIL CONFIGURATION
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_USE_TLS = True
+EMAIL_PORT = 587
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
