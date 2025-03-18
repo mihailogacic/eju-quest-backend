@@ -8,8 +8,10 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from django.shortcuts import get_object_or_404
 
-from .serializers import LessonSerializer
+
+from .serializers import LessonSerializer, LessonSummarySerializer
 from .services import LessonServices
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
 
@@ -149,16 +151,42 @@ class SaveLessonContentView(APIView):
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
 
 
+class LessonSummaryView(APIView):
+
+    def post(self, request):
+        data = request.data
+        print('wht')
+        serializer = LessonSummarySerializer(
+            data=data, context={'request': request})
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'detail': "Lesson summary successfully saved!"}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class LessonApi(APIView):
     pass
 
 
-class ApproveLesson(APIView):
-    pass
+class ApproveLessonView(APIView):
+    def post(self, request):
+        data = request.data
+        lesson_id = data.get('lesson_id')
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        lesson.status = 'approved'
+        lesson.save()
+        return Response({'detail':  "Lesson has been successfully approved."}, status=status.HTTP_200_OK)
 
 
-class UnapproveLesson(APIView):
-    pass
+class UnapproveLessonView(APIView):
+    def post(self, request):
+        data = request.data
+        lesson_id = data.get('lesson_id')
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        lesson.delete()
+        return Response({'detail':  "Lesson has been successfully unapproved."}, status=status.HTTP_204_NO_CONTENT)
 
 
 class QuizApi(APIView):
