@@ -43,47 +43,21 @@ class GenerateNewLessonView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# class LessonsViewset(viewsets.ModelViewSet):
-#     queryset = Lesson.objects.all()
-#     filter_backends = [DjangoFilterBackend]
-#     filterset_class = LessonFilter
+class SubmitLesson(APIView):
+    pass
 
-#     def get_serializer_class(self):
-#         """
-#         Dynamically returns the serializer based on the action being performed.
-#         """
-#         if self.action == "generate_new_lesson":
-#             return LessonSerializer
 
-#         return LessonSerializer
+class Lesson(APIView):
+    pass
 
-#     def retrieve(self, request, *args, **kwargs):
-#         pass
 
-#     @action(detail=False, methods=['post'], url_path='add-questions/')
-#     def add_questions_to_the_lesson(self, request):
-#         pass
+class ApproveLesson(APIView):
+    pass
 
-#     @action(detail=False, methods=['post'], url_path='approve/')
-#     def approve_lesson(self, request):
-#         pass
 
-#     @action(detail=False, methods=['post'], url_path='unapprove/')
-#     def unapprove_lesson(self, request):
-#         pass
+class UnapproveLesson(APIView):
+    pass
 
-#     @action(detail=False, methods=['post'], url_path='explore-approved/')
-#     def explore_approved_lessons(self, request):
-#         pass
 
-#     @action(detail=False, methods=['post'], url_path='quiz/')
-#     def view_quiz(self, request):
-#         pass
-
-#     @action(detail=False, methods=['post'], url_path='submit-quiz/')
-#     def submit_quiz(self, request):
-#         pass
-
-#     @action(detail=False, methods=['post'], url_path='summary/')
-#     def submit_summary(self, request):
-#         pass
+class Quiz(APIView):
+    pass
