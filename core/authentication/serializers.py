@@ -25,11 +25,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration with proper validations and email confirmation."""
 
     confirm_password = serializers.CharField(write_only=True, min_length=8)
-    zip_code = serializers.CharField(required=True, max_length=10)
-    subscription_plan = serializers.ChoiceField(choices=[
-        ('trial', 'Trial'), ('core', 'Core'), ('advanced', 'Advanced')
-    ])
-    terms_accepted = serializers.BooleanField(write_only=True)
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
 
@@ -37,7 +32,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'first_name', 'last_name', 'email', 'password', 'confirm_password',
-            'role', 'zip_code', 'subscription_plan', 'terms_accepted'
+            'role', 'accepted_terms_date'
         ]
 
     def validate_email(self, value):
@@ -57,8 +52,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError({"password": "Passwords do not match."})
         
-        if not attrs.get('terms_accepted', False):
-            raise serializers.ValidationError({"terms_accepted": "Terms must be accepted to register."})
+        if not attrs.get('accepted_terms_date', ""):
+            raise serializers.ValidationError({"accepted_terms_date": "Terms must be accepted to register."})
         
         # Restrict children creation
         role = attrs.get('role', 'parent')
@@ -71,7 +66,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create user and handle email confirmation."""
         validated_data.pop('confirm_password')
-        validated_data.pop('terms_accepted')
+        validated_data.pop('accepted_terms_date')
         role = validated_data.get('role', 'parent')
 
         validated_data['is_active'] = False if role == 'parent' else True
