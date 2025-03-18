@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 
-from .serializers import LessonSerializer
+from .serializers import LessonSerializer, LessonSummarySerializer
 from .services import LessonServices
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
 
@@ -147,6 +147,21 @@ class SaveLessonContentView(APIView):
             quiz_question.save()
 
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
+
+
+class LessonSummaryView(APIView):
+
+    def post(self, request):
+        data = request.data
+        print('wht')
+        serializer = LessonSummarySerializer(
+            data=data, context={'request': request})
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'detail': "Lesson summary successfully saved!"}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LessonApi(APIView):

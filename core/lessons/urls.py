@@ -11,5 +11,6 @@ urlpatterns = [
     path('generate-new-lesson/', views.GenerateNewLessonView.as_view(),
          name='generate-new-lesson'),
 
-    path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson')
+    path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
+    path('summary/', views.LessonSummaryView.as_view(), name='save-lesson-summary')
 ]

@@ -5,7 +5,7 @@ of data that comes to the backend from frontend.
 
 from rest_framework import serializers
 from core.exceptions import CustomValidationException
-from .models import Lesson
+from .models import Lesson, LessonSummary
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -17,7 +17,7 @@ class LessonSerializer(serializers.ModelSerializer):
         model = Lesson
         fields = ['id', 'title', 'image',
                   'age_level', 'lesson_length', 'status']
-        read_only_fields = ['creator']  # Ensure the creator is read-only
+        read_only_fields = ['creator']
 
     def validate_age_level(self, value):
         """
@@ -131,12 +131,26 @@ class LessonSerializer(serializers.ModelSerializer):
 #         fields = ['id', 'lesson', 'questions']
 
 
-# class LessonSummarySerializer(serializers.ModelSerializer):
-#     """
-#     Serializer for LessonSummary model.
-#     """
-#     creator = serializers.StringRelatedField(read_only=True)
+class LessonSummarySerializer(serializers.ModelSerializer):
+    """
+    Serializer for LessonSummary model.
+    """
 
-#     class Meta:
-#         model = LessonSummary
-#         fields = ['id', 'creator', 'description']
+    class Meta:
+        model = LessonSummary
+        fields = ['id', 'lesson', 'description']
+        read_only_fields = ['creator']
+
+    def create(self, validated_data):
+        """
+        Overwrites default create method and 
+        provides authenticated user
+        """
+        request = self.context.get('request')
+        lesson_id = request.data.get('lesson_id')
+        print(lesson_id)
+        lesson = Lesson.objects.get(id=lesson_id)
+        if request and hasattr(request, "user"):
+            validated_data['creator'] = request.user
+            validated_data['lesson'] = lesson
+        return super().create(validated_data)
