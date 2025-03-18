@@ -8,6 +8,8 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from django.shortcuts import get_object_or_404
+
 
 from .serializers import LessonSerializer, LessonSummarySerializer
 from .services import LessonServices
@@ -172,8 +174,13 @@ class ApproveLesson(APIView):
     pass
 
 
-class UnapproveLesson(APIView):
-    pass
+class UnapproveLessonView(APIView):
+    def post(self, request):
+        data = request.data
+        lesson_id = data.get('lesson_id')
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        lesson.delete()
+        return Response({'detail':  "Lesson has been successfully unapproved."}, status=status.HTTP_204_NO_CONTENT)
 
 
 class QuizApi(APIView):

@@ -12,5 +12,8 @@ urlpatterns = [
          name='generate-new-lesson'),
 
     path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
-    path('summary/', views.LessonSummaryView.as_view(), name='save-lesson-summary')
+    path('summary/', views.LessonSummaryView.as_view(),
+         name='save-lesson-summary'),
+    path('unapprove/', views.UnapproveLessonView.as_view(),
+         name='unapprove-lesson')
 ]
