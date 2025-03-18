@@ -28,7 +28,7 @@ class Lesson(models.Model):
     image = models.ImageField(upload_to='lesson_images/')
     age_level = models.IntegerField()
     lesson_length = models.CharField(max_length=10)
-    lesson_status = models.CharField(max_length=10)
+    status = models.CharField(max_length=10)
 
     def __str__(self):
         return f'{self.creator.first_name} {self.creator.first_name} - {self.title}'
