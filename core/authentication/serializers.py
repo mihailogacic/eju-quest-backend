@@ -32,11 +32,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def create(self, validated_data):  # pylint: disable=unused-argument
         """Not implemented, as JWT creation is handled by get_token."""
-        raise NotImplementedError('create() method is not used for this serializer.')
+        raise NotImplementedError(
+            'create() method is not used for this serializer.')
 
     def update(self, instance, validated_data):  # pylint: disable=unused-argument
         """Not implemented, as JWT creation is handled by get_token."""
-        raise NotImplementedError('update() method is not used for this serializer.')
+        raise NotImplementedError(
+            'update() method is not used for this serializer.')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -79,15 +81,18 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         """Validate passwords match and terms acceptance."""
         if attrs['password'] != attrs['confirm_password']:
-            raise serializers.ValidationError({'password': 'Passwords do not match.'})
+            raise serializers.ValidationError(
+                {'password': 'Passwords do not match.'})
 
         if not attrs.get('accepted_terms_date'):
-            raise serializers.ValidationError({'accepted_terms_date': 'Terms must be accepted.'})
+            raise serializers.ValidationError(
+                {'accepted_terms_date': 'Terms must be accepted.'})
 
         role = attrs.get('role', 'parent')
         request_user = self.context.get('request').user
         if role == 'child' and (not request_user or request_user.role != 'parent'):
-            raise serializers.ValidationError({'role': 'Only parents can create child accounts.'})
+            raise serializers.ValidationError(
+                {'role': 'Only parents can create child accounts.'})
 
         return attrs
 
@@ -104,14 +109,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         try:
             user = User.objects.create_user(**validated_data)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError('Failed to create user.') from exc
+            raise serializers.ValidationError(
+                'Failed to create user.') from exc
 
         if user.role == 'parent':
             try:
                 self.send_confirmation_email(user)
             except Exception as exc:
                 user.delete()
-                raise serializers.ValidationError('Failed to send confirmation email.') from exc
+                raise serializers.ValidationError(
+                    'Failed to send confirmation email.') from exc
 
             return {'detail': 'Registration successful. Please confirm your email.'}
 
@@ -142,7 +149,8 @@ class PasswordResetOTPRequestSerializer(serializers.Serializer):
     def validate_email(self, value):
         """Ensure the email corresponds to an existing user."""
         if not User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('No user found with this email address.')
+            raise serializers.ValidationError(
+                'No user found with this email address.')
         return value
 
     def create(self, validated_data):
@@ -157,7 +165,7 @@ class PasswordResetOTPRequestSerializer(serializers.Serializer):
         send_mail(
             subject='Your Password Reset OTP - EjuQuest',
             message=(
-                f'Your OTP is: {otp_instance.otp_code}. '\
+                f'Your OTP is: {otp_instance.otp_code}. '
                 'It expires in 10 minutes.'
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -168,7 +176,8 @@ class PasswordResetOTPRequestSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):  # pylint: disable=unused-argument
         """Not implemented, as this serializer does not handle updates."""
-        raise NotImplementedError('update() method is not used for this serializer.')
+        raise NotImplementedError(
+            'update() method is not used for this serializer.')
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
@@ -199,11 +208,13 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     def create(self, validated_data):  # pylint: disable=unused-argument
         """Not implemented, as this serializer uses save() instead of create()."""
-        raise NotImplementedError('create() method is not used for this serializer.')
+        raise NotImplementedError(
+            'create() method is not used for this serializer.')
 
     def update(self, instance, validated_data):  # pylint: disable=unused-argument
         """Not implemented, as this serializer uses save() instead of update()."""
-        raise NotImplementedError('update() method is not used for this serializer.')
+        raise NotImplementedError(
+            'update() method is not used for this serializer.')
 
     def save(self, **kwargs):  # fix arguments-differ by using kwargs
         """Set new password and invalidate OTP."""
@@ -222,5 +233,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         """Define serializer fields and read-only fields."""
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'role', 'created_at']
+        fields = ['id', 'first_name', 'last_name',
+                  'email', 'role', 'created_at']
         read_only_fields = ['id', 'email', 'role', 'created_at']

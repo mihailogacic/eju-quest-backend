@@ -25,10 +25,11 @@ class Lesson(models.Model):
 
     creator = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
-    image = models.ImageField(upload_to='lesson_images/')
+    image = models.ImageField(
+        upload_to='lesson_images/', blank=True, null=True)
     age_level = models.IntegerField()
     lesson_length = models.CharField(max_length=10)
-    lesson_status = models.CharField(max_length=10)
+    status = models.CharField(max_length=10, default="pending")
 
     def __str__(self):
         return f'{self.creator.first_name} {self.creator.first_name} - {self.title}'
