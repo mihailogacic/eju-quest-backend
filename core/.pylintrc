@@ -47,7 +47,7 @@ fail-under=10
 #from-stdin=
 
 # Files or directories to be skipped. They should be base names, not paths.
-ignore=settings.py, apps.py, tests.py, manage.py
+ignore=apps.py, tests.py, manage.py
 
 
 
@@ -60,7 +60,8 @@ ignore-paths=.*/migrations
 # Files or directories matching the regular expression patterns are skipped.
 # The regex matches against base names, not paths. The default value ignores
 # Emacs file locks
-ignore-patterns=^\.#
+ignore-patterns=.*migrations.*,.*apps.py
+
 
 # List of module names for which member attributes should not be checked and
 # will not be imported (useful for modules/projects where namespaces are

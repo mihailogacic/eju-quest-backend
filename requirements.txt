@@ -6,7 +6,9 @@ charset-normalizer==3.4.1
 dill==0.3.9
 dj-database-url==2.3.0
 Django==5.1.7
+django-cors-headers==4.7.0
 django-environ==0.12.0
+django-storages==1.14.5
 djangorestframework==3.15.2
 djangorestframework-jwt==1.11.0
 djangorestframework_simplejwt==5.5.0
@@ -20,6 +22,7 @@ isort==6.0.1
 mccabe==0.7.0
 oauthlib==3.2.2
 packaging==24.2
+pillow==11.1.0
 platformdirs==4.3.6
 psycopg2-binary==2.9.10
 pyasn1==0.6.1
