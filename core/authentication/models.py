@@ -55,15 +55,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='parent')
-    accepted_terms_date = models.DateTimeField(null=True, blank=True)
     parent = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
     )
     is_verified = models.BooleanField(default=False)
-    last_login_ip = models.GenericIPAddressField(blank=True, null=True)
-    email_confirmation_token = models.UUIDField(
-        default=uuid.uuid4, unique=True, null=True, blank=True
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -88,41 +83,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.deleted_at = now()
         self.is_active = False
         self.save()
-
-
-class OTP(models.Model):
-    """Model for OTP codes for authentication and password resets."""
-
-    OTP_PURPOSES = [
-        ('registration', 'Registration'),
-        ('login', 'Login'),
-        ('password_reset', 'Password Reset'),
-    ]
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otps')
-    otp_code = models.CharField(max_length=6)
-    purpose = models.CharField(max_length=20, choices=OTP_PURPOSES)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    is_used = models.BooleanField(default=False)
-    attempts = models.PositiveIntegerField(default=0)
-
-    def save(self, *args, **kwargs):
-        """Generate OTP and set expiry if not already set."""
-        if not self.otp_code:
-            self.otp_code = str(random.randint(100000, 999999))
-        if not self.expires_at:
-            self.expires_at = now() + timedelta(minutes=10)
-        super().save(*args, **kwargs)
-
-    def is_expired(self):
-        """Check if the OTP has expired."""
-        return now() > self.expires_at
-
-    def __str__(self):
-        """Return a string representation of the OTP instance."""
-        # pylint: disable=no-member
-        return f"OTP ({self.purpose}) for {self.user.email}"
 
 
 class UserActivityLog(models.Model):

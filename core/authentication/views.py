@@ -3,6 +3,9 @@
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.utils.timezone import now
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth.tokens import default_token_generator
 
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -13,7 +16,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import (
     RegisterSerializer,
     CustomTokenObtainPairSerializer,
-    PasswordResetOTPRequestSerializer,
+    PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
     UserProfileSerializer
 )
@@ -23,29 +26,38 @@ User = get_user_model()
 
 
 class VerifyEmailView(generics.GenericAPIView):
-    """Verify a user's email via a confirmation token."""
-
+    """
+    Verify a user's email using a confirmation link.
+    """
     permission_classes = [AllowAny]
 
-    def get(self, _request, token):  # rename request to _request since it's unused
-        """Verify email confirmation token."""
-        user = get_object_or_404(User, email_confirmation_token=token)
-        if user.is_verified:
+    def get(self, request, uidb64, token, *args, **kwargs):
+        try:
+            # Decode the uidb64 to get the user id
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        # Check the token validity and update the user accordingly
+        if user is not None and default_token_generator.check_token(user, token):
+            if user.is_verified:
+                return Response(
+                    {'message': 'Email already verified.'},
+                    status=status.HTTP_200_OK
+                )
+            user.is_verified = True
+            user.is_active = True
+            user.save()
             return Response(
-                {'message': 'Email already verified.'},
+                {'message': 'Email verified successfully.'},
                 status=status.HTTP_200_OK
             )
-
-        user.is_verified = True
-        user.is_active = True
-        user.email_confirmation_token = None
-        user.save()
-
-        return Response(
-            {'message': 'Email verified successfully.'},
-            status=status.HTTP_200_OK
-        )
-
+        else:
+            return Response(
+                {'error': 'Invalid or expired token.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class RegisterView(generics.GenericAPIView):
     """Register new users with role-specific permissions."""
@@ -69,76 +81,87 @@ class RegisterView(generics.GenericAPIView):
 
 class LoginView(TokenObtainPairView):
     """Authenticate users and log security events on failure."""
-
     serializer_class = CustomTokenObtainPairSerializer
 
-    def post(self, request, *_args, **_kwargs):
-        """Handle user login and log failed attempts."""
+    def post(self, request, *args, **kwargs):
         try:
-            return super().post(request, *_args, **_kwargs)
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            # The serializer returns tokens with keys "refresh" and "access"
+            token_data = serializer.validated_data
+            user = serializer.user
+            custom_response = {
+                "access_token": token_data.get("access"),
+                "refresh_token": token_data.get("refresh"),
+                "user": UserProfileSerializer(user).data,
+            }
+            return Response(custom_response, status=status.HTTP_200_OK)
         except Exception as exc:
-            ip_address = request.META.get('REMOTE_ADDR')
-            email = request.data.get('email', '')
+            ip_address = request.META.get("REMOTE_ADDR")
+            email = request.data.get("email", "")
             user = User.objects.filter(email=email).first()
             log_security_event(
                 user=user,
                 email=email,
                 ip_address=ip_address,
-                event_type='failed_login',
-                event_description='Failed login attempt.',
+                event_type="failed_login",
+                event_description="Failed login attempt.",
                 failed_attempts=1
             )
             raise exc
 
 
-class PasswordResetOTPRequestView(generics.GenericAPIView):
-    """Request OTP for password reset."""
-
-    serializer_class = PasswordResetOTPRequestSerializer
+class PasswordResetRequestView(generics.GenericAPIView):
+    """Request a password reset link."""
+    serializer_class = PasswordResetRequestSerializer
     permission_classes = [AllowAny]
 
-    def post(self, request, *_args, **_kwargs):
-        """Generate and email password reset OTP."""
+    def post(self, request, *args, **kwargs):
+        """Generate and email the password reset link."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        otp_instance = serializer.save()
-        ip_address = request.META.get('REMOTE_ADDR')
+        serializer.save()
+        email = serializer.validated_data['email']
+        user = User.objects.get(email=email)
+        ip_address = request.META.get("REMOTE_ADDR")
         log_security_event(
-            user=otp_instance.user,
-            email=otp_instance.user.email,
+            user=user,
+            email=email,
             ip_address=ip_address,
-            event_type='password_reset_request',
-            event_description='Password reset OTP requested.',
+            event_type="password_reset_request",
+            event_description="Password reset link requested.",
             failed_attempts=0
         )
         return Response(
-            {'message': 'OTP has been sent to your email.'},
+            {"message": "Password reset link has been sent to your email."},
             status=status.HTTP_200_OK
         )
 
 
 class PasswordResetConfirmView(generics.GenericAPIView):
-    """Confirm OTP and reset user's password."""
-
+    """Confirm token and reset user's password."""
     serializer_class = PasswordResetConfirmSerializer
     permission_classes = [AllowAny]
 
-    def post(self, request, *_args, **_kwargs):
-        """Validate OTP and update password."""
-        serializer = self.get_serializer(data=request.data)
+    def post(self, request, uidb64, token, *args, **kwargs):
+        """
+        Validate token from the URL and update the user's password.
+        Expects JSON payload with new_password and confirm_new_password.
+        """
+        serializer = self.get_serializer(data=request.data, context={"uidb64": uidb64, "token": token})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        ip_address = request.META.get('REMOTE_ADDR')
+        ip_address = request.META.get("REMOTE_ADDR")
         log_security_event(
             user=user,
             email=user.email,
             ip_address=ip_address,
-            event_type='password_reset_success',
-            event_description='Password reset successful.',
+            event_type="password_reset_success",
+            event_description="Password reset successful.",
             failed_attempts=0
         )
         return Response(
-            {'message': 'Password has been reset successfully.'},
+            {"message": "Password has been reset successfully."},
             status=status.HTTP_200_OK
         )
 
