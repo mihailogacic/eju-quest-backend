@@ -41,8 +41,8 @@ _ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS')
 
 ALLOWED_HOSTS = [_ALLOWED_HOSTS]
 
-CSRF_TRUSTED_ORIGINS = [BACKEND_URL, FRONTEND_URL]
-CORS_ALLOWED_ORIGINS = [BACKEND_URL, FRONTEND_URL]
+CSRF_TRUSTED_ORIGINS = [BACKEND_URL, FRONTEND_URL, "http://localhost:5173", "https://eju-quest-e8438fb5030d.herokuapp.com"]
+CORS_ALLOWED_ORIGINS = [BACKEND_URL, FRONTEND_URL, "http://localhost:5173", "https://eju-quest-e8438fb5030d.herokuapp.com"]
 CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
