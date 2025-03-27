@@ -66,7 +66,7 @@ class RegisterView(generics.GenericAPIView):
 
     def get_permissions(self):
         """Define permissions based on user role."""
-        role = self.request.data.get('role')
+        role = self.request.data.get('role', 'parent')
         if self.request.method == 'POST' and role == 'child':
             return [IsAuthenticated()]
         return [AllowAny()]

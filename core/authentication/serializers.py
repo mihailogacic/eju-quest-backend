@@ -46,7 +46,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     confirm_password = serializers.CharField(write_only=True, min_length=8)
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, default="parent")
 
     class Meta:
         """Define serializer fields and validation rules."""
