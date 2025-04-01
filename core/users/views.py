@@ -83,7 +83,8 @@ class ParentDashboardView(generics.GenericAPIView):
         try:
             # List the parent and all child users added by the parent.
             users = User.objects.filter(
-                Q(id=request.user.id) | Q(parent=request.user)
+                Q(id=request.user.id) | Q(parent=request.user),
+                is_active=True
             )
             users_serializer = UserProfileSerializer(users, many=True)
 
