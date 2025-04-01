@@ -270,43 +270,62 @@ class QuizAPI(APIView):
         serializer = QuizSerializer(quiz)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request, format=None):
+    def post(self, request, lesson, format=None):
         """
-        Submit a new quiz.
-
-        This method creates a new quiz instance along with its related quiz questions and options
-        (if provided). It restricts users from creating more than one quiz per lesson.
-
-        Args:
-            request (HttpRequest): The HTTP request containing quiz data.
-            format (str, optional): Format suffix for content negotiation.
-
-        Returns:
-            Response: A response object containing the created quiz data with status 201 if successful,
-                    or validation errors with status 400.
+        Submit quiz answers and return the result.
+        Expected input:
+        {
+            "lesson_id": 1,
+            "answers": [
+                {"question_id": 101, "selected_option": "A"},
+                ...
+            ]
+        }
         """
-        # Extract lesson ID from input data.
-        lesson_id = request.data.get("lesson")
-        if not lesson_id:
+        lesson_id = request.data.get("lesson_id")
+        answers = request.data.get("answers", [])
+
+        if not lesson_id or not answers:
             return Response(
-                {"lesson": ["This field is required."]},
+                {"detail": "'lesson_id' and 'answers' are required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check if a quiz already exists for the given lesson.
-        if Quiz.objects.filter(lesson_id=lesson_id).exists():
-            return Response(
-                {"detail": "Quiz already exists for this lesson."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        quiz = get_object_or_404(Quiz, lesson_id=lesson_id)
 
-        # Process quiz creation.
-        serializer = QuizSerializer(
-            data=request.data, context={'request': request})
-        if serializer.is_valid():
-            quiz = serializer.save()
-            return Response(
-                QuizSerializer(quiz, context={'request': request}).data,
-                status=status.HTTP_201_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        correct_count = 0
+        results = []
+
+        for answer in answers:
+            q_id = answer.get("question_id")
+            selected_option = answer.get("selected_option")
+
+            try:
+                question = QuizQuestions.objects.get(id=q_id, quiz=quiz)
+            except QuizQuestions.DoesNotExist:
+                continue
+
+            correct_option = question.options.filter(correct=True).first()
+            is_correct = (selected_option == correct_option.option) if correct_option else False
+
+            if is_correct:
+                correct_count += 1
+
+            results.append({
+                "question_id": q_id,
+                "selected_option": selected_option,
+                "correct": "true" if is_correct else "false"
+            })
+
+        total_questions = len(answers)
+        score = round((correct_count / total_questions) * 100) if total_questions > 0 else 0
+        passed = score >= 50
+
+        return Response({
+            "detail": "Quiz completed successfully.",
+            "score": score,
+            "correct_answers": correct_count,
+            "total_questions": total_questions,
+            "answers": results,
+            "passed": passed
+        }, status=status.HTTP_200_OK)

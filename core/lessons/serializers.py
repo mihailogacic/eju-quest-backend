@@ -122,7 +122,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
     Serializer for QuizQuestions model.
     """
     quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all())
-    # options = QuizQuestionOptionSerializer(many=True)
+    options = QuizQuestionOptionSerializer(many=True)
 
     class Meta:
         model = QuizQuestions
