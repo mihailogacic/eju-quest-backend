@@ -2,7 +2,7 @@
 This module contains all APIs related to Lessons, Quiz including creation
 and child interaction with both.
 """
-import logging
+import logging, json
 
 from rest_framework import status
 from rest_framework.views import APIView
@@ -90,51 +90,50 @@ class SaveLessonContentView(APIView):
     
     def post(self, request, *args, **kwargs):
         data = request.data
+        image = request.FILES.get("image")
 
-        # Validate required keys
-        if 'content' not in data or 'questions' not in data:
+        # Parse content and questions from JSON string
+        try:
+            content = json.loads(data.get("content", "[]"))
+            questions = json.loads(data.get("questions", "[]"))
+        except json.JSONDecodeError:
+            return Response({"detail": "Invalid JSON format in content or questions."}, status=400)
+
+        # Validate required fields
+        if not content or not questions:
             return Response(
-                {"detail": "Invalid data format. 'content' and 'questions' fields are required."},
+                {"detail": "'content' and 'questions' fields are required and cannot be empty."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Determine lesson title (use provided title or fallback to first section heading)
-        lesson_title = data.get("title") or (data["content"][0].get(
-            "heading") if data["content"] else "Untitled Lesson")
-        
-        image = request.FILES.get("image")
+        # Determine lesson title
+        lesson_title = data.get("title") or (content[0].get("heading") if content else "Untitled Lesson")
 
         # Create the Lesson instance
         lesson = Lesson.objects.create(
             creator=request.user,
             title=lesson_title,
-            # Default value; can be adjusted
             age_level=data.get('age_level'),
-            # Default value; can be adjusted
             lesson_length=data.get('lesson_length'),
             image=image,
             status="pending"
         )
 
-        # Create Sections from content data
-        for section in data["content"]:
+        # Create Sections
+        for section in content:
             heading = section.get("heading", "")
             text = section.get("text", "")
             if heading and text:
-                Sections.objects.create(
-                    lesson=lesson, heading=heading, content=text)
+                Sections.objects.create(lesson=lesson, heading=heading, content=text)
 
-        # Create a Quiz for the lesson
+        # Create Quiz and Questions
         quiz = Quiz.objects.create(lesson=lesson)
-
-        # Process each question
-        for question_data in data["questions"]:
+        for question_data in questions:
             question_text = question_data.get("question", "")
             options_data = question_data.get("options", [])
             correct_answer = question_data.get("answer", "")
 
             created_options = []
-            # Create all options and determine which is correct
             for option_data in options_data:
                 option_letter = option_data.get("option")
                 option_text = option_data.get("text")
@@ -147,13 +146,11 @@ class SaveLessonContentView(APIView):
                 )
                 created_options.append(quiz_option)
 
-            # Create the quiz question and associate all options
             quiz_question = QuizQuestions.objects.create(
                 quiz=quiz,
                 question_text=question_text
             )
-            quiz_question.options.set(created_options)  # Associate all options
-            quiz_question.save()
+            quiz_question.options.set(created_options)
 
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
 
