@@ -6,13 +6,14 @@ import logging
 
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 
 from django.shortcuts import get_object_or_404
 from django.shortcuts import get_object_or_404
 
 
-from .serializers import LessonSerializer, QuizSerializer, LessonSummarySerializer
+from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer
 from .services import LessonServices
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
 
@@ -56,12 +57,12 @@ class SaveLessonContentView(APIView):
     API view to save lesson content along with its sections and quiz data.
 
     This view will:
-      - Create a Lesson instance.
-      - Create Sections from the "content" list.
-      - Create a Quiz for the Lesson.
-      - For each question:
-        - Create multiple QuizQuestionOptions.
-        - Link all options to the corresponding QuizQuestions instance.
+        - Create a Lesson instance.
+        - Create Sections from the "content" list.
+        - Create a Quiz for the Lesson.
+        - For each question:
+            - Create multiple QuizQuestionOptions.
+            - Link all options to the corresponding QuizQuestions instance.
 
     Expected JSON Format:
     {
@@ -151,7 +152,6 @@ class SaveLessonContentView(APIView):
 
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
 
-
 class LessonSummaryView(APIView):
 
     def post(self, request):
@@ -194,6 +194,10 @@ class LessonAPI(APIView):
         serializer = LessonSerializer(lessons, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class LessonReviewView(RetrieveAPIView):
+    queryset = Lesson.objects.all()
+    serializer_class = LessonDetailSerializer
+    lookup_field = 'pk'
 
 class ApproveLessonView(APIView):
     def post(self, request):
@@ -204,7 +208,6 @@ class ApproveLessonView(APIView):
         lesson.save()
         return Response({'detail':  "Lesson has been successfully approved."}, status=status.HTTP_200_OK)
 
-
 class UnapproveLessonView(APIView):
     def post(self, request):
         data = request.data
@@ -212,7 +215,6 @@ class UnapproveLessonView(APIView):
         lesson = get_object_or_404(Lesson, id=lesson_id)
         lesson.delete()
         return Response({'detail':  "Lesson has been successfully unapproved."}, status=status.HTTP_204_NO_CONTENT)
-
 
 class QuizAPI(APIView):
     """
@@ -234,7 +236,7 @@ class QuizAPI(APIView):
 
         Returns:
             Response: A response object containing the quiz data if found,
-                      otherwise an error message with status 404.
+                        otherwise an error message with status 404.
         """
         quiz = get_object_or_404(Quiz, lesson=lesson)
         serializer = QuizSerializer(quiz)

@@ -5,14 +5,13 @@ of data that comes to the backend from frontend.
 
 from rest_framework import serializers
 from core.exceptions import CustomValidationException
-from .models import Lesson,  Quiz, QuizQuestions, QuizQuestionOptions, LessonSummary
+from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonSummary
 
 
 class LessonSerializer(serializers.ModelSerializer):
     """
     Serializer for Lesson model.
     """
-
     class Meta:
         model = Lesson
         fields = ['id', 'title', 'image',
@@ -86,6 +85,17 @@ class LessonSerializer(serializers.ModelSerializer):
             validated_data['creator'] = request.user
         return super().create(validated_data)
 
+class SectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sections
+        fields = ['heading', 'content']
+
+class LessonDetailSerializer(serializers.ModelSerializer):
+    sections = SectionSerializer(many=True, source='sections_set')
+
+    class Meta:
+        model = Lesson
+        fields = ['id', 'title', 'image', 'age_level', 'lesson_length', 'status', 'sections']
 
 class QuizQuestionOptionSerializer(serializers.ModelSerializer):
     """

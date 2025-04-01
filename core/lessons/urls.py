@@ -12,6 +12,7 @@ urlpatterns = [
      path('generate-new-lesson/', views.GenerateNewLessonView.as_view(),
           name='generate-new-lesson'),
      path('list/', views.LessonAPI.as_view(), name='pending-lessons'),
+     path('<int:pk>/', views.LessonReviewView.as_view(), name='lesson-review'),
 
      # quiz
      path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
