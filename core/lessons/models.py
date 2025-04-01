@@ -27,7 +27,7 @@ class Lesson(models.Model):
     title = models.CharField(max_length=255)
     image = models.ImageField(
         upload_to='lesson_images/', blank=True, null=True)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
     age_level = models.IntegerField()
     lesson_length = models.CharField(max_length=10)
     status = models.CharField(max_length=10, default="pending")
