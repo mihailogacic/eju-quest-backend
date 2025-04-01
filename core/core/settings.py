@@ -34,6 +34,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
+HEROKU = os.getenv("HEROKU") == "True"
 
 FRONTEND_URL = os.getenv('FRONTEND_URL')
 BACKEND_URL = os.getenv('BACKEND_URL')
@@ -103,7 +104,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Database Configuration
-if DEBUG:
+if not HEROKU:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
