@@ -16,7 +16,7 @@ class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
         fields = ['id', 'title', 'image',
-                    'age_level', 'lesson_length', 'description', 'status']
+                    'age_level', 'lesson_length', 'description', 'status', 'creator']
         read_only_fields = ['creator']
 
     def get_creator(self, obj):
