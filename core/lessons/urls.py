@@ -14,12 +14,11 @@ urlpatterns = [
      path('list/', views.LessonAPI.as_view(), name='pending-lessons'),
      path('<int:pk>/', views.LessonReviewView.as_view(), name='lesson-review'),
      path('explore-approved/', views.ExploreApprovedLessonsView.as_view(), name='explore-approved-lessons'),
+     path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
 
      # quiz
-     path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
      path('submit-quiz/', views.QuizAPI.as_view(), name='quiz-submit'),
      path('quiz/<int:lesson>/', views.QuizAPI.as_view(), name='quiz-detail'),
-
 
      path('summary/', views.LessonSummaryView.as_view(),
           name='save-lesson-summary'),

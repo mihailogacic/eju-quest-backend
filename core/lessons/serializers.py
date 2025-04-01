@@ -122,7 +122,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
     Serializer for QuizQuestions model.
     """
     quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all())
-    options = QuizQuestionOptionSerializer()
+    # options = QuizQuestionOptionSerializer(many=True)
 
     class Meta:
         model = QuizQuestions
@@ -134,13 +134,11 @@ class QuizSerializer(serializers.ModelSerializer):
     Serializer for Quiz model.
     Accepts a lesson ID for creation and returns lesson details.
     """
-    # Accept the lesson ID for input.
     lesson = serializers.PrimaryKeyRelatedField(
         queryset=Lesson.objects.all(), write_only=True
     )
-    # Return full lesson details in the response.
     lesson_detail = LessonSerializer(source='lesson', read_only=True)
-    questions = QuizQuestionSerializer(many=True, read_only=True)
+    questions = QuizQuestionSerializer(many=True, read_only=True, source='quizquestions_set')
 
     class Meta:
         model = Quiz

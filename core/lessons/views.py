@@ -168,7 +168,6 @@ class LessonSummaryView(APIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class LessonAPI(APIView):
     """
     API view to retrieve lessons with optional filtering by status.
