@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from django.shortcuts import get_object_or_404
 from django.shortcuts import get_object_or_404
@@ -85,7 +86,8 @@ class SaveLessonContentView(APIView):
         ]
     }
     """
-
+    parser_classes = [MultiPartParser, FormParser]
+    
     def post(self, request, *args, **kwargs):
         data = request.data
 
@@ -99,6 +101,8 @@ class SaveLessonContentView(APIView):
         # Determine lesson title (use provided title or fallback to first section heading)
         lesson_title = data.get("title") or (data["content"][0].get(
             "heading") if data["content"] else "Untitled Lesson")
+        
+        image = request.FILES.get("image")
 
         # Create the Lesson instance
         lesson = Lesson.objects.create(
@@ -108,6 +112,7 @@ class SaveLessonContentView(APIView):
             age_level=data.get('age_level'),
             # Default value; can be adjusted
             lesson_length=data.get('lesson_length'),
+            image=image,
             status="pending"
         )
 
