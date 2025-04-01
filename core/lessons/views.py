@@ -186,10 +186,11 @@ class LessonAPI(APIView):
             Response: A response object containing serialized lesson data.
         """
         status_filter = request.query_params.get('status')
+        lessons = Lesson.objects.filter(creator=request.user)
+
         if status_filter:
-            lessons = Lesson.objects.filter(status__iexact=status_filter)
-        else:
-            lessons = Lesson.objects.all()
+            lessons = lessons.filter(status__iexact=status_filter)
+
         serializer = LessonSerializer(lessons, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
