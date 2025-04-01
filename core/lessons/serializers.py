@@ -12,11 +12,15 @@ class LessonSerializer(serializers.ModelSerializer):
     """
     Serializer for Lesson model.
     """
+    creator = serializers.SerializerMethodField()
     class Meta:
         model = Lesson
         fields = ['id', 'title', 'image',
                     'age_level', 'lesson_length', 'description', 'status']
         read_only_fields = ['creator']
+
+    def get_creator(self, obj):
+        return obj.creator.first_name
 
     def validate_age_level(self, value):
         """
@@ -86,11 +90,17 @@ class LessonSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class SectionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Sections model.
+    """
     class Meta:
         model = Sections
         fields = ['heading', 'content']
 
 class LessonDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Lesson model with related sections.
+    """
     sections = SectionSerializer(many=True, source='sections_set')
 
     class Meta:

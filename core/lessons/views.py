@@ -216,6 +216,33 @@ class UnapproveLessonView(APIView):
         lesson.delete()
         return Response({'detail':  "Lesson has been successfully unapproved."}, status=status.HTTP_204_NO_CONTENT)
 
+class ExploreApprovedLessonsView(APIView):
+    """
+    Returns all approved lessons created by the parent of the logged-in child user.
+
+    Response includes:
+        - recommended_courses: list of lessons
+        - recent_activity: empty for now
+    """
+    def get(self, request):
+        """
+        GET method to fetch approved lessons for the child's parent.
+        """
+        user = request.user
+        parent = user.parent
+
+        if not parent:
+            return Response({"error": "Only child users can explore approved lessons."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        approved_lessons = Lesson.objects.filter(creator=parent, status="approved")
+        serializer = LessonSerializer(approved_lessons, many=True)
+
+        return Response({
+            "recommended_courses": serializer.data,
+            "recent_activity": []
+        }, status=status.HTTP_200_OK)
+
 class QuizAPI(APIView):
     """
     API view to handle quiz submission and retrieval.
