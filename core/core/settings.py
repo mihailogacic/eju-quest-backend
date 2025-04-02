@@ -16,7 +16,6 @@ import base64
 import dj_database_url
 import json
 import logging
-import ssl
 from datetime import timedelta
 from dotenv import load_dotenv
 from google.oauth2 import service_account
@@ -302,3 +301,13 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+
+from ssl import CERT_NONE
+
+CELERY_BROKER_USE_SSL = {
+    'ssl_cert_reqs': CERT_NONE
+}
+
+CELERY_REDIS_BACKEND_USE_SSL = {
+    'ssl_cert_reqs': CERT_NONE
+}
