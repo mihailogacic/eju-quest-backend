@@ -15,7 +15,6 @@ from celery.result import AsyncResult
 
 
 from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer
-from .services import LessonServices
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
 from .tasks import generate_lesson_task
 
