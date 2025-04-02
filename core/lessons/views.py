@@ -17,6 +17,7 @@ from celery.result import AsyncResult
 from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer
 from .services import LessonServices
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
+from .tasks import generate_lesson_task
 
 logger = logging.getLogger(__name__)
 
@@ -35,23 +36,22 @@ class GenerateNewLessonView(APIView):
         Handles POST method for this API.
         """
 
-        serializer = LessonSerializer(
-            data=request.data, context={'request': request})
+        serializer = LessonSerializer(data=request.data, context={'request': request})
 
-        # Check if the data is valid
         if serializer.is_valid():
-            lesson = LessonServices.generate_new_content(
-                serializer.validated_data)
-            print(lesson)
+            task = generate_lesson_task.delay(serializer.validated_data)
 
-            return Response({"lesson": lesson, "prompt_input": {
-                "age_level": serializer.validated_data.get('age_level'),
-                "title": serializer.validated_data.get('title'),
-                "lesson_length": serializer.validated_data.get('lesson_length')
-            }}, status=status.HTTP_200_OK)
+            return Response({
+                "task_id": task.id,
+                "status": "processing",
+                "prompt_input": {
+                    "age_level": serializer.validated_data.get('age_level'),
+                    "title": serializer.validated_data.get('title'),
+                    "lesson_length": serializer.validated_data.get('lesson_length')
+                }
+            }, status=status.HTTP_202_ACCEPTED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 class CheckTaskStatusView(APIView):
 
     def get(self, request, task_id):
