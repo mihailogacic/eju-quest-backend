@@ -270,7 +270,7 @@ class QuizAPI(APIView):
         serializer = QuizSerializer(quiz)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request, lesson, format=None):
+    def post(self, request, format=None):
         """
         Submit quiz answers and return the result.
         Expected input:
@@ -329,3 +329,4 @@ class QuizAPI(APIView):
             "answers": results,
             "passed": passed
         }, status=status.HTTP_200_OK)
+
