@@ -15,7 +15,7 @@ from celery.result import AsyncResult
 
 
 from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer
-from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions
+from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonVisit
 from .tasks import generate_lesson_task
 
 logger = logging.getLogger(__name__)
@@ -205,9 +205,29 @@ class LessonAPI(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class LessonReviewView(RetrieveAPIView):
+    """
+    Retrieve a single lesson and track the visit by the user.
+    Keeps max 2 recent lessons per child user.
+    """
     queryset = Lesson.objects.all()
     serializer_class = LessonDetailSerializer
     lookup_field = 'pk'
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+
+        if request.user.is_authenticated and request.user.parent_id:
+            lesson = self.get_object()
+
+            LessonVisit.objects.filter(user=request.user, lesson=lesson).delete()
+
+            visits = LessonVisit.objects.filter(user=request.user).order_by('-visited_at')
+            if visits.count() >= 2:
+                visits.last().delete()
+
+            LessonVisit.objects.create(user=request.user, lesson=lesson)
+
+        return response
 
 class ApproveLessonView(APIView):
     def post(self, request):
@@ -229,15 +249,11 @@ class UnapproveLessonView(APIView):
 class ExploreApprovedLessonsView(APIView):
     """
     Returns all approved lessons created by the parent of the logged-in child user.
-
     Response includes:
         - recommended_courses: list of lessons
-        - recent_activity: empty for now
+        - recent_activity: last 2 visited lessons
     """
     def get(self, request):
-        """
-        GET method to fetch approved lessons for the child's parent.
-        """
         user = request.user
         parent = user.parent
 
@@ -245,12 +261,18 @@ class ExploreApprovedLessonsView(APIView):
             return Response({"error": "Only child users can explore approved lessons."},
                             status=status.HTTP_403_FORBIDDEN)
 
+        # Recommended courses
         approved_lessons = Lesson.objects.filter(creator=parent, status="approved")
-        serializer = LessonSerializer(approved_lessons, many=True)
+        recommended_serializer = LessonSerializer(approved_lessons, many=True)
+
+        # Recent activity (last 2 visited lessons)
+        recent_visits = LessonVisit.objects.filter(user=user).select_related('lesson')[:2]
+        recent_lessons = [visit.lesson for visit in recent_visits]
+        recent_serializer = LessonSerializer(recent_lessons, many=True)
 
         return Response({
-            "recommended_courses": serializer.data,
-            "recent_activity": []
+            "recommended_courses": recommended_serializer.data,
+            "recent_activity": recent_serializer.data
         }, status=status.HTTP_200_OK)
 
 class QuizAPI(APIView):

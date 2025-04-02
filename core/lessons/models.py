@@ -35,6 +35,17 @@ class Lesson(models.Model):
     def __str__(self):
         return f'{self.creator.first_name} {self.creator.first_name} - {self.title}'
 
+class LessonVisit(models.Model):
+    """
+    Tracks when a user views a specific lesson.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE)
+    visited_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-visited_at']
+
 class Sections(models.Model):
     """
     Represents a section within a lesson. 
