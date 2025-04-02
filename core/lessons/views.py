@@ -51,6 +51,7 @@ class GenerateNewLessonView(APIView):
             }, status=status.HTTP_202_ACCEPTED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class CheckTaskStatusView(APIView):
 
     def get(self, request, task_id):
@@ -58,8 +59,8 @@ class CheckTaskStatusView(APIView):
 
         if result.ready():
             return Response({"status": "completed", "result": result.result}, status=status.HTTP_200_OK)
-        
-        return Response({"status": "processing"}, status=status.HTTP_202_ACCEPTE)
+
+        return Response({"status": "processing"}, status=status.HTTP_202_ACCEPTED)
 
 class SaveLessonContentView(APIView):
     """
