@@ -1,3 +1,4 @@
 release: python core/manage.py makemigrations && python core/manage.py migrate
 web: gunicorn core.wsgi --chdir core --log-file -
-worker: cd core && celery -A core.celery worker --loglevel=info
+worker: celery -A core worker --loglevel INFO --concurrency=2
+
