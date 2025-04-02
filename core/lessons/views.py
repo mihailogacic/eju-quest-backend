@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from django.shortcuts import get_object_or_404
-from django.shortcuts import get_object_or_404
+from celery.result import AsyncResult
 
 
 from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer
@@ -52,6 +52,15 @@ class GenerateNewLessonView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class CheckTaskStatusView(APIView):
+
+    def get(self, request, task_id):
+        result = AsyncResult(task_id)
+
+        if result.ready():
+            return Response({"status": "completed", "result": result.result}, status=status.HTTP_200_OK)
+        
+        return Response({"status": "processing"}, status=status.HTTP_202_ACCEPTE)
 
 class SaveLessonContentView(APIView):
     """
