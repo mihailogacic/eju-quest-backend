@@ -13,12 +13,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
 from django.db import transaction
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from celery.result import AsyncResult
 
+from authentication.models import User
 
-from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer
-from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonVisit
+from .services import LessonServices
+from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer, QuizResultSerializer, CompletedLessonSerializer
+from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonVisit, QuizResult, LessonSummary
 from .tasks import generate_lesson_task
 
 logger = logging.getLogger(__name__)
@@ -348,6 +351,12 @@ class QuizAPI(APIView):
         """
         lesson_id = request.data.get("lesson_id")
         answers = request.data.get("answers", [])
+        raw_time = request.data.get("remaining_time")
+        remaining_time = LessonServices.parse_remaining_time(raw_time)
+
+        if remaining_time is None:
+            return Response({"detail": "'remaining_time' format is not valid."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if not lesson_id or not answers:
             return Response(
@@ -371,7 +380,7 @@ class QuizAPI(APIView):
 
             correct_option = question.options.filter(correct=True).first()
             is_correct = (selected_option == correct_option.option) if correct_option else False
-
+            
             if is_correct:
                 correct_count += 1
 
@@ -383,7 +392,20 @@ class QuizAPI(APIView):
 
         total_questions = len(answers)
         score = round((correct_count / total_questions) * 100) if total_questions > 0 else 0
-        passed = score >= 50
+        passed = score >= 50 and remaining_time > 0
+
+        QuizResult.objects.update_or_create(
+            user=request.user,
+            lesson_id=lesson_id,
+            defaults={
+                "score": score,
+                "correct_answers": correct_count,
+                "total_questions": total_questions,
+                "passed": passed,
+                "answers": results,
+                "remaining_time": remaining_time,
+            },
+        )
 
         return Response({
             "detail": "Quiz completed successfully.",
@@ -391,6 +413,76 @@ class QuizAPI(APIView):
             "correct_answers": correct_count,
             "total_questions": total_questions,
             "answers": results,
-            "passed": passed
+            "passed": passed,
         }, status=status.HTTP_200_OK)
 
+class LessonResultsView(APIView):
+    """
+    GET /api/v1/lessons/<int:lesson_id>/results/
+
+    Dostupno samo roditelju koji je kreirao lesson.
+    Vraća rezultate kviza + summaries koje su ostavila njegova deca.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, lesson_id):
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+
+        if lesson.creator != request.user:
+            return Response(
+                {"detail": "You do not have permission to view these results."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        children = User.objects.filter(parent=request.user)
+
+        quiz_results = QuizResult.objects.filter(
+            lesson=lesson, user__in=children
+        )
+        results_serializer = QuizResultSerializer(quiz_results, many=True)
+
+        summaries = LessonSummary.objects.filter(
+            lesson=lesson, creator__in=children
+        ).values(
+            'id',
+            child_username= F('creator__username'),
+            description= F('description'),
+            created_at= F('created_at'),
+        )
+
+        return Response({
+            "lesson_title": lesson.title,
+            "quiz_results": results_serializer.data,
+            "summaries": list(summaries),
+        }, status=status.HTTP_200_OK)
+
+class ChildCompletedLessonsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, child_id):
+        child = get_object_or_404(User, id=child_id)
+
+        if child.parent_id != request.user.id:
+            return Response({"detail": "Not your child."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        results = (QuizResult.objects
+                    .filter(user=child)
+                    .select_related("lesson")
+                    .order_by("-created_at"))
+
+        summary_map = dict(
+            LessonSummary.objects.filter(
+                creator=child,
+                lesson_id__in=results.values_list("lesson_id", flat=True)
+            ).values_list("lesson_id", "description")
+        )
+
+        serializer = CompletedLessonSerializer(
+            results, many=True, context={"summaries": summary_map}
+        )
+
+        return Response({
+            "child_username": child.username,
+            "completed_lessons": serializer.data
+        }, status=status.HTTP_200_OK)

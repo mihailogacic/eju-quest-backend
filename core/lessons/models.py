@@ -5,8 +5,8 @@ It includes models for lessons, sections, quizzes, quiz questions, quiz options,
 and lesson summaries. Each model represents a key component of the learning 
 platform and is linked via ForeignKey relationships.
 """
-
 from django.db import models
+
 from authentication.models import User
 
 
@@ -122,6 +122,25 @@ class QuizQuestions(models.Model):
     def __str__(self):
         return f'Question: {self.question_text}'
 
+class QuizResult(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    lesson = models.ForeignKey('Lesson', on_delete=models.CASCADE)
+    score = models.PositiveSmallIntegerField()
+    correct_answers = models.PositiveSmallIntegerField()
+    total_questions = models.PositiveSmallIntegerField()
+    remaining_time = models.PositiveIntegerField()
+    passed = models.BooleanField()
+    answers = models.JSONField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'lesson')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user} – {self.lesson.title} ({self.score}%)'
 
 class LessonSummary(models.Model):
     """

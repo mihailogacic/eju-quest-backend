@@ -5,7 +5,7 @@ of data that comes to the backend from frontend.
 
 from rest_framework import serializers
 from core.exceptions import CustomValidationException
-from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonSummary
+from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonSummary, QuizResult
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -144,6 +144,15 @@ class QuizSerializer(serializers.ModelSerializer):
         model = Quiz
         fields = ['id', 'lesson', 'lesson_detail', 'questions']
 
+class QuizResultSerializer(serializers.ModelSerializer):
+    child_username = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = QuizResult
+        fields = (
+            'id', 'child_username', 'score',
+            'correct_answers', 'total_questions', 'passed', 'answers', 'created_at'
+        )
 
 class LessonSummarySerializer(serializers.ModelSerializer):
     """
@@ -168,3 +177,20 @@ class LessonSummarySerializer(serializers.ModelSerializer):
             validated_data['creator'] = request.user
             validated_data['lesson'] = lesson
         return super().create(validated_data)
+
+class CompletedLessonSerializer(serializers.ModelSerializer):
+    id    = serializers.IntegerField(source="lesson.id")
+    title = serializers.CharField(source="lesson.title")
+    completed_at = serializers.DateTimeField(source="created_at")
+    summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = QuizResult
+        fields = (
+            "id", "title", "score", "passed",
+            "remaining_time", "completed_at", "summary"
+        )
+
+    def get_summary(self, obj):
+        summaries = self.context.get("summaries", {})
+        return summaries.get(obj.lesson_id, "")

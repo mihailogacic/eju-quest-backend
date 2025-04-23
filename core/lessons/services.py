@@ -74,3 +74,27 @@ class LessonServices:
         text_response = response.choices[0].message.content.strip()
         json_object = json.loads(text_response)
         return json_object
+
+    @staticmethod
+    def parse_remaining_time(rt):
+        """
+        Prima:
+        • int  → sekunde           (npr. 47)
+        • str  → 'mm:ss'           ('02:15')
+        • int  → milisekunde ≥1000 (32000)
+        Vraća int sekunde ili None.
+        """
+        if rt is None:
+            return None
+        try:
+            rt = int(rt)
+            if rt >= 1000:
+                return rt // 1000
+            return rt
+        except ValueError:
+            pass
+
+        if isinstance(rt, str) and ":" in rt:
+            m, s = rt.split(":")
+            return int(m) * 60 + int(s)
+        return None
