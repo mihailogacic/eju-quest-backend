@@ -14,6 +14,7 @@ urlpatterns = [
      path('tasks/<str:task_id>/status/', views.CheckTaskStatusView.as_view(), name='task_status'),
      path('list/', views.LessonAPI.as_view(), name='pending-lessons'),
      path('<int:pk>/', views.LessonReviewView.as_view(), name='lesson-review'),
+     path('<int:pk>/delete/', views.LessonDeleteView.as_view(), name='lesson-delete'),
      path('explore-approved/', views.ExploreApprovedLessonsView.as_view(), name='explore-approved-lessons'),
      path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
 

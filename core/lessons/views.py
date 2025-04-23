@@ -9,7 +9,10 @@ from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from celery.result import AsyncResult
 
@@ -228,6 +231,36 @@ class LessonReviewView(RetrieveAPIView):
             LessonVisit.objects.create(user=request.user, lesson=lesson)
 
         return response
+
+class LessonDeleteView(APIView):
+    """
+    DELETE /api/v1/lessons/<pk>/delete/
+
+    Briše lekciju i sve zavisne entitete + sliku sa cloud-a.
+    Dozvoljeno je samo kreatoru (ili staff-u/superuser-u).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk, *args, **kwargs):
+        lesson = get_object_or_404(Lesson, pk=pk)
+
+        if lesson.creator != request.user:
+            raise PermissionDenied("You do not have permission to delete this lesson.")
+
+        with transaction.atomic():
+            if lesson.image:
+                lesson.image.delete(save=False)
+
+            QuizQuestionOptions.objects.filter(
+                quizquestions__quiz__lesson=lesson
+            ).delete()
+
+            lesson.delete()
+
+        return Response(
+            {"detail": "Lesson and all related data were deleted."},
+            status=status.HTTP_204_NO_CONTENT,
+        )
 
 class ApproveLessonView(APIView):
     def post(self, request):
