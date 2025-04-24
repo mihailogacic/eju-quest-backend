@@ -161,7 +161,7 @@ class LessonSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LessonSummary
-        fields = ['id', 'lesson', 'description']
+        fields = ['id', 'lesson', 'description', 'created_at']
         read_only_fields = ['creator']
 
     def create(self, validated_data):
@@ -179,18 +179,51 @@ class LessonSummarySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class CompletedLessonSerializer(serializers.ModelSerializer):
+    child_username = serializers.CharField(source="user.username")
     id    = serializers.IntegerField(source="lesson.id")
     title = serializers.CharField(source="lesson.title")
     completed_at = serializers.DateTimeField(source="created_at")
-    summary = serializers.SerializerMethodField()
 
     class Meta:
         model  = QuizResult
         fields = (
-            "id", "title", "score", "passed",
-            "remaining_time", "completed_at", "summary"
+            "child_username",
+            "id", "title", "passed", "completed_at"
         )
 
-    def get_summary(self, obj):
-        summaries = self.context.get("summaries", {})
-        return summaries.get(obj.lesson_id, "")
+class SingleQuizResultSerializer(serializers.ModelSerializer):
+    child_username = serializers.CharField(source="user.username")
+    answers = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = QuizResult
+        exclude = ("lesson", "user", "updated_at")
+
+    def get_answers(self, obj):
+        """
+        Za svaki zapis u obj.answers (JSONField sa question_id, selected_option, correct),
+        dohvatimo QuizQuestions instancu, serijalizujemo je postojećim QuizQuestionSerializer-om,
+        i iz njega kreiramo dict koji API očekuje.
+        """
+        detail = []
+        for entry in obj.answers:
+            q_id = entry["question_id"]
+            selected = entry["selected_option"]
+            correct_flag = entry["correct"]
+
+            question = QuizQuestions.objects.get(pk=q_id)
+            q_data = QuizQuestionSerializer(question).data
+
+            opts_dict = {opt["option"]: opt["option_text"] for opt in q_data["options"]}
+
+            correct_opt = next((opt["option"] for opt in q_data["options"] if opt["correct"]), None)
+
+            detail.append({
+                "question_text":    q_data["question_text"],
+                "options":          opts_dict,
+                "correct_option":   correct_opt,
+                "selected_option":  selected,
+                "correct":          correct_flag,
+            })
+
+        return detail

@@ -20,7 +20,7 @@ from celery.result import AsyncResult
 from authentication.models import User
 
 from .services import LessonServices
-from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer, QuizResultSerializer, CompletedLessonSerializer
+from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer, SingleQuizResultSerializer, CompletedLessonSerializer
 from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonVisit, QuizResult, LessonSummary
 from .tasks import generate_lesson_task
 
@@ -416,73 +416,57 @@ class QuizAPI(APIView):
             "passed": passed,
         }, status=status.HTTP_200_OK)
 
+class CompletedLessonsView(APIView):
+    """
+    GET /api/v1/lessons/completed-lessons/
+    Vrati SVE results zapise za SVU roditeljevu decu.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        children = User.objects.filter(parent=request.user)
+        results = (QuizResult.objects
+                    .filter(user__in=children)
+                    .select_related("lesson", "user")
+                    .order_by("-created_at"))
+
+        serializer = CompletedLessonSerializer(results, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class LessonResultsView(APIView):
     """
-    GET /api/v1/lessons/<int:lesson_id>/results/
-
-    Dostupno samo roditelju koji je kreirao lesson.
-    Vraća rezultate kviza + summaries koje su ostavila njegova deca.
+    GET /api/v1/lessons/<lesson_id>/results/?child_id=17
+    Vrati detaljan rezultat za to dete + njegov summary (ako postoji).
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, lesson_id):
+        child_id = request.query_params.get("child_id")
+        if not child_id:
+            return Response({"detail": "child_id is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         lesson = get_object_or_404(Lesson, id=lesson_id)
+        child  = get_object_or_404(User, id=child_id)
 
-        if lesson.creator != request.user:
-            return Response(
-                {"detail": "You do not have permission to view these results."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        if lesson.creator != request.user or child.parent_id != request.user.id:
+            return Response({"detail": "Forbidden."},
+                            status=status.HTTP_403_FORBIDDEN)
 
-        children = User.objects.filter(parent=request.user)
+        result = get_object_or_404(QuizResult, lesson=lesson, user=child)
 
-        quiz_results = QuizResult.objects.filter(
-            lesson=lesson, user__in=children
-        )
-        results_serializer = QuizResultSerializer(quiz_results, many=True)
+        res_ser = SingleQuizResultSerializer(result)
 
-        summaries = LessonSummary.objects.filter(
-            lesson=lesson, creator__in=children
-        ).values(
-            'id',
-            child_username= F('creator__username'),
-            description= F('description'),
-            created_at= F('created_at'),
-        )
+        summary_obj = (LessonSummary.objects
+                        .filter(lesson=lesson, creator=child)
+                        .order_by("-created_at")
+                        .first())
+        summary_data = (LessonSummarySerializer(summary_obj).data
+                        if summary_obj else None)
 
         return Response({
             "lesson_title": lesson.title,
-            "quiz_results": results_serializer.data,
-            "summaries": list(summaries),
-        }, status=status.HTTP_200_OK)
-
-class ChildCompletedLessonsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, child_id):
-        child = get_object_or_404(User, id=child_id)
-
-        if child.parent_id != request.user.id:
-            return Response({"detail": "Not your child."},
-                            status=status.HTTP_403_FORBIDDEN)
-
-        results = (QuizResult.objects
-                    .filter(user=child)
-                    .select_related("lesson")
-                    .order_by("-created_at"))
-
-        summary_map = dict(
-            LessonSummary.objects.filter(
-                creator=child,
-                lesson_id__in=results.values_list("lesson_id", flat=True)
-            ).values_list("lesson_id", "description")
-        )
-
-        serializer = CompletedLessonSerializer(
-            results, many=True, context={"summaries": summary_map}
-        )
-
-        return Response({
             "child_username": child.username,
-            "completed_lessons": serializer.data
+            "quiz_results": res_ser.data,
+            "summary": summary_data,
         }, status=status.HTTP_200_OK)

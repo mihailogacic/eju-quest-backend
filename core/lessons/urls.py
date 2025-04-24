@@ -21,8 +21,9 @@ urlpatterns = [
      # quiz
      path('submit-quiz/', views.QuizAPI.as_view(), name='quiz-submit'),
      path('quiz/<int:lesson>/', views.QuizAPI.as_view(), name='quiz-detail'),
-     path('child/<int:child_id>/completed-lessons/', views.ChildCompletedLessonsView.as_view(),
-     name='completed-lessons'),
+     
+     #results
+     path('completed-lessons/', views.CompletedLessonsView.as_view(), name='completed-lessons'),
      path('<int:lesson_id>/results/', views.LessonResultsView.as_view(), name='lesson-results'),
 
      path('summary/', views.LessonSummaryView.as_view(),
