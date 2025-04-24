@@ -165,21 +165,24 @@ class LessonSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LessonSummary
-        fields = ['id', 'lesson', 'description', 'created_at']
+        fields = ['id', 'lesson', 'description', 'remaining_time', 'created_at']
         read_only_fields = ['creator']
 
     def create(self, validated_data):
-        """
-        Overwrites default create method and 
-        provides authenticated user
-        """
         request = self.context.get('request')
         lesson_id = request.data.get('lesson_id')
-        print(lesson_id)
+        raw_time  = request.data.get('remaining_time')
+        from .services import LessonServices
+        remaining = LessonServices.parse_remaining_time(raw_time)
+        if remaining is None:
+            raise serializers.ValidationError({
+                "remaining_time": "Invalid format, must be seconds|mm:ss|ms"
+            })
+        validated_data['remaining_time'] = remaining
+
         lesson = Lesson.objects.get(id=lesson_id)
-        if request and hasattr(request, "user"):
-            validated_data['creator'] = request.user
-            validated_data['lesson'] = lesson
+        validated_data['creator'] = request.user
+        validated_data['lesson'] = lesson
         return super().create(validated_data)
 
 class CompletedLessonSerializer(serializers.ModelSerializer):

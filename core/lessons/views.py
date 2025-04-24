@@ -172,10 +172,10 @@ class SaveLessonContentView(APIView):
 class LessonSummaryView(APIView):
 
     def post(self, request):
-        data = request.data
-        print('wht')
         serializer = LessonSummarySerializer(
-            data=data, context={'request': request})
+            data=request.data,
+            context={'request': request}
+        )
 
         if serializer.is_valid():
             serializer.save()
