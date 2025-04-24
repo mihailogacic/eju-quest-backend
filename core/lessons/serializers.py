@@ -184,24 +184,34 @@ class LessonSummarySerializer(serializers.ModelSerializer):
 
 class CompletedLessonSerializer(serializers.ModelSerializer):
     child_username = serializers.SerializerMethodField()
-    id    = serializers.IntegerField(source="lesson.id")
+    id = serializers.IntegerField(source="lesson.id")
     title = serializers.CharField(source="lesson.title")
+    lesson_image = serializers.SerializerMethodField()
     completed_at = serializers.DateTimeField(source="created_at")
 
     class Meta:
         model  = QuizResult
         fields = (
             "child_username",
-            "id", "title", "passed", "completed_at"
+            "id", "title", "passed",
+            "completed_at", "lesson_image",
         )
 
     def get_child_username(self, obj):
         user = obj.user
         return f"{user.first_name} {user.last_name}"
 
+    def get_lesson_image(self, obj):
+        request = self.context.get("request")
+        img = obj.lesson.image
+        if img and hasattr(img, "url"):
+            return request.build_absolute_uri(img.url)
+        return None
+
 class SingleQuizResultSerializer(serializers.ModelSerializer):
     child_username = serializers.SerializerMethodField()
     answers = serializers.SerializerMethodField()
+    lesson_image = serializers.SerializerMethodField()
 
     class Meta:
         model  = QuizResult
@@ -239,3 +249,10 @@ class SingleQuizResultSerializer(serializers.ModelSerializer):
     def get_child_username(self, obj):
         user = obj.user
         return f"{user.first_name} {user.last_name}"
+
+    def get_lesson_image(self, obj):
+        request = self.context.get("request")
+        img = obj.lesson.image
+        if img and hasattr(img, "url"):
+            return request.build_absolute_uri(img.url)
+        return None

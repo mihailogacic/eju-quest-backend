@@ -430,7 +430,11 @@ class CompletedLessonsView(APIView):
                     .select_related("lesson", "user")
                     .order_by("-created_at"))
 
-        serializer = CompletedLessonSerializer(results, many=True)
+        serializer = CompletedLessonSerializer(
+            results,
+            many=True,
+            context={"request": request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class LessonResultsView(APIView):
@@ -455,7 +459,10 @@ class LessonResultsView(APIView):
 
         result = get_object_or_404(QuizResult, lesson=lesson, user=child)
 
-        res_ser = SingleQuizResultSerializer(result)
+        res_ser = SingleQuizResultSerializer(
+            result,
+            context={"request": request}
+        )
 
         summary_obj = (LessonSummary.objects
                         .filter(lesson=lesson, creator=child)
