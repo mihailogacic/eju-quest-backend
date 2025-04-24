@@ -466,7 +466,7 @@ class LessonResultsView(APIView):
 
         return Response({
             "lesson_title": lesson.title,
-            "child_username": child.username,
+            "child_username": child.first_name,
             "quiz_results": res_ser.data,
             "summary": summary_data,
         }, status=status.HTTP_200_OK)

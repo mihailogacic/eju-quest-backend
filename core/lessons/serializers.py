@@ -145,7 +145,7 @@ class QuizSerializer(serializers.ModelSerializer):
         fields = ['id', 'lesson', 'lesson_detail', 'questions']
 
 class QuizResultSerializer(serializers.ModelSerializer):
-    child_username = serializers.CharField(source='user.username', read_only=True)
+    child_username = serializers.SerializerMethodField()
 
     class Meta:
         model = QuizResult
@@ -153,6 +153,10 @@ class QuizResultSerializer(serializers.ModelSerializer):
             'id', 'child_username', 'score',
             'correct_answers', 'total_questions', 'passed', 'answers', 'created_at'
         )
+    
+    def get_child_username(self, obj):
+        user = obj.user
+        return f"{user.first_name} {user.last_name}"
 
 class LessonSummarySerializer(serializers.ModelSerializer):
     """
@@ -179,7 +183,7 @@ class LessonSummarySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class CompletedLessonSerializer(serializers.ModelSerializer):
-    child_username = serializers.CharField(source="user.username")
+    child_username = serializers.SerializerMethodField()
     id    = serializers.IntegerField(source="lesson.id")
     title = serializers.CharField(source="lesson.title")
     completed_at = serializers.DateTimeField(source="created_at")
@@ -191,8 +195,12 @@ class CompletedLessonSerializer(serializers.ModelSerializer):
             "id", "title", "passed", "completed_at"
         )
 
+    def get_child_username(self, obj):
+        user = obj.user
+        return f"{user.first_name} {user.last_name}"
+
 class SingleQuizResultSerializer(serializers.ModelSerializer):
-    child_username = serializers.CharField(source="user.username")
+    child_username = serializers.SerializerMethodField()
     answers = serializers.SerializerMethodField()
 
     class Meta:
@@ -227,3 +235,7 @@ class SingleQuizResultSerializer(serializers.ModelSerializer):
             })
 
         return detail
+
+    def get_child_username(self, obj):
+        user = obj.user
+        return f"{user.first_name} {user.last_name}"
