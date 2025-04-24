@@ -184,6 +184,7 @@ class LessonSummarySerializer(serializers.ModelSerializer):
 
 class CompletedLessonSerializer(serializers.ModelSerializer):
     child_username = serializers.SerializerMethodField()
+    child_id = serializers.IntegerField(source="user.id")
     id = serializers.IntegerField(source="lesson.id")
     title = serializers.CharField(source="lesson.title")
     lesson_image = serializers.SerializerMethodField()
@@ -192,7 +193,7 @@ class CompletedLessonSerializer(serializers.ModelSerializer):
     class Meta:
         model  = QuizResult
         fields = (
-            "child_username",
+            "child_username", "child_id",
             "id", "title", "passed",
             "completed_at", "lesson_image",
         )
