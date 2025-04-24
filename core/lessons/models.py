@@ -154,6 +154,7 @@ class LessonSummary(models.Model):
     creator = models.ForeignKey(User, on_delete=models.CASCADE)
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, null=True)
     description = models.TextField()
+    created_at  = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'Lesson Summary by {self.creator.first_name} {self.creator.last_name}'
