@@ -120,9 +120,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Send email with confirmation link."""
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        # Use URL name "verify_email" matching your URL configuration.
-        link = reverse("verify_email", kwargs={"uidb64": uid, "token": token})
-        verification_url = f"{settings.BACKEND_URL}{link}"
+        verification_url = f"{settings.FRONTEND_URL}/verify-email/{uid}/{token}"
         send_mail(
             subject="Confirm Your Account",
             message=f"Click the link to confirm your account: {verification_url}",
