@@ -118,9 +118,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
     def send_confirmation_email(self, user):
         """Send email with confirmation link."""
-        token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        verification_url = f"{settings.FRONTEND_URL}/sign-up?uid={uid}&token={token}"
+        token = default_token_generator.make_token(user)
+        verification_url = f"{settings.FRONTEND_URL}/verify-email/{uid}/{token}"
         send_mail(
             subject="Confirm Your Account",
             message=f"Click the link to confirm your account: {verification_url}",
@@ -195,5 +195,5 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         """Define serializer fields and read-only fields."""
         model = User
-        fields = ["id", "first_name", "last_name", "email", "role"]
+        fields = ["id", "first_name", "last_name", "email", "role", "reward_points"]
         read_only_fields = ["id", "email", "role"]

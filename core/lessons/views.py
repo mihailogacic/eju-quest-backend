@@ -338,17 +338,6 @@ class QuizAPI(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, format=None):
-        """
-        Submit quiz answers and return the result.
-        Expected input:
-        {
-            "lesson_id": 1,
-            "answers": [
-                {"question_id": 101, "selected_option": "A"},
-                ...
-            ]
-        }
-        """
         lesson_id = request.data.get("lesson_id")
         answers = request.data.get("answers", [])
         raw_time = request.data.get("remaining_time")
@@ -366,7 +355,10 @@ class QuizAPI(APIView):
 
         quiz = get_object_or_404(Quiz, lesson_id=lesson_id)
 
+        total_quiz_questions = QuizQuestions.objects.filter(quiz=quiz).count()
+
         correct_count = 0
+        processed_answers = 0
         results = []
 
         for answer in answers:
@@ -380,40 +372,65 @@ class QuizAPI(APIView):
 
             correct_option = question.options.filter(correct=True).first()
             is_correct = (selected_option == correct_option.option) if correct_option else False
-            
+
             if is_correct:
                 correct_count += 1
 
+            processed_answers += 1
             results.append({
                 "question_id": q_id,
                 "selected_option": selected_option,
                 "correct": "true" if is_correct else "false"
             })
 
-        total_questions = len(answers)
-        score = round((correct_count / total_questions) * 100) if total_questions > 0 else 0
-        passed = score >= 50 and remaining_time > 0
+        score_percent = round((correct_count / total_quiz_questions) * 100) if total_quiz_questions > 0 else 0
 
-        QuizResult.objects.update_or_create(
-            user=request.user,
-            lesson_id=lesson_id,
-            defaults={
-                "score": score,
-                "correct_answers": correct_count,
-                "total_questions": total_questions,
-                "passed": passed,
-                "answers": results,
-                "remaining_time": remaining_time,
-            },
-        )
+        answered_enough = processed_answers > (total_quiz_questions / 2)
+        eligible_now = answered_enough and (remaining_time > 0)
+
+        new_points = score_percent if eligible_now else 0
+
+        try:
+            existing = QuizResult.objects.get(user=request.user, lesson_id=lesson_id)
+            prev_percent = round((existing.correct_answers / total_quiz_questions) * 100) if total_quiz_questions > 0 else 0
+            prev_answered_enough = existing.total_questions > (total_quiz_questions / 2)
+            prev_eligible = prev_answered_enough and (existing.remaining_time > 0)
+            prev_points = prev_percent if prev_eligible else 0
+        except QuizResult.DoesNotExist:
+            existing = None
+            prev_points = 0
+
+        delta = max(0, new_points - prev_points)
+
+        with transaction.atomic():
+            QuizResult.objects.update_or_create(
+                user=request.user,
+                lesson_id=lesson_id,
+                defaults={
+                    "score": score_percent,
+                    "correct_answers": correct_count,
+                    "total_questions": processed_answers,
+                    "passed": eligible_now,
+                    "answers": results,
+                    "remaining_time": remaining_time,
+                },
+            )
+
+            user = request.user
+            if getattr(user, "role", None) == "child" and delta > 0:
+                user.__class__.objects.filter(pk=user.pk).update(reward_points=F('reward_points') + delta)
+                user.refresh_from_db(fields=["reward_points"])
 
         return Response({
             "detail": "Quiz completed successfully.",
-            "score": score,
+            "score": score_percent,
             "correct_answers": correct_count,
-            "total_questions": total_questions,
+            "total_questions": processed_answers,
+            "total_quiz_questions": total_quiz_questions,
             "answers": results,
-            "passed": passed,
+            "passed": eligible_now,
+            "added_points": delta,
+            "reward_points": getattr(user, "reward_points", 0),
         }, status=status.HTTP_200_OK)
 
 class CompletedLessonsView(APIView):

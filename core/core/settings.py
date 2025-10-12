@@ -9,32 +9,25 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
-from pathlib import Path
 import os
 import base64
 import dj_database_url
 import json
 import logging
+from pathlib import Path
+from ssl import CERT_NONE
 from datetime import timedelta
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 
 load_dotenv()
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
-HEROKU = os.getenv("HEROKU") == "True"
+PRODUCTION = os.getenv("PRODUCTION") == "True"
 
 FRONTEND_URL = os.getenv('FRONTEND_URL')
 BACKEND_URL = os.getenv('BACKEND_URL')
@@ -42,8 +35,8 @@ _ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS')
 
 ALLOWED_HOSTS = [_ALLOWED_HOSTS]
 
-CSRF_TRUSTED_ORIGINS = [BACKEND_URL, FRONTEND_URL, "http://localhost:5173", "https://eju-quest-e8438fb5030d.herokuapp.com"]
-CORS_ALLOWED_ORIGINS = [BACKEND_URL, FRONTEND_URL, "http://localhost:5173", "https://eju-quest-e8438fb5030d.herokuapp.com"]
+CSRF_TRUSTED_ORIGINS = [BACKEND_URL, FRONTEND_URL]
+CORS_ALLOWED_ORIGINS = [BACKEND_URL, FRONTEND_URL]
 CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
@@ -104,7 +97,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Database Configuration
-if not HEROKU:
+if not PRODUCTION:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -138,18 +131,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
@@ -237,7 +225,6 @@ except Exception as e:
     logging.error("Error loading Google Cloud credentials: %s", e)
     raise ValueError("Error while loading Google Cloud Credentials!")
 
-
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
@@ -294,20 +281,31 @@ OPEN_AI_API_KEY = os.getenv('OPEN_AI_API_KEY', None)
 if not OPEN_AI_API_KEY:
     raise ValueError("OpenAI API is Missing!")
 
-CELERY_BROKER_URL = os.environ.get("REDIS_URL")
-CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
+if PRODUCTION:
+    CELERY_BROKER_URL = os.getenv("REDIS_URL")
+    CELERY_RESULT_BACKEND = os.getenv("REDIS_URL")
 
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "UTC"
+    CELERY_ACCEPT_CONTENT = ["json"]
+    CELERY_TASK_SERIALIZER = "json"
+    CELERY_RESULT_SERIALIZER = "json"
+    CELERY_TIMEZONE = "UTC"
 
-from ssl import CERT_NONE
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': CERT_NONE
+    }
 
-CELERY_BROKER_USE_SSL = {
-    'ssl_cert_reqs': CERT_NONE
-}
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': CERT_NONE
+    }
+else:
+    REDIS_URL = "redis://127.0.0.1:6379/0"
+    CELERY_BROKER_URL = REDIS_URL
+    CELERY_RESULT_BACKEND = REDIS_URL
 
-CELERY_REDIS_BACKEND_USE_SSL = {
-    'ssl_cert_reqs': CERT_NONE
-}
+    CELERY_ACCEPT_CONTENT = ["json"]
+    CELERY_TASK_SERIALIZER = "json"
+    CELERY_RESULT_SERIALIZER = "json"
+    CELERY_TIMEZONE = "UTC"
+
+    CELERY_BROKER_USE_SSL = None
+    CELERY_REDIS_BACKEND_USE_SSL = None

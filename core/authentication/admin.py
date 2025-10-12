@@ -8,7 +8,7 @@ from .models import User, SecurityLog
 class UserAdmin(admin.ModelAdmin):
     """Admin view for User model."""
 
-    list_display = ('email', 'first_name', 'last_name', 'role', 'is_active', 'is_verified')
+    list_display = ('email', 'first_name', 'last_name', 'role', 'is_active', 'is_verified', 'reward_points')
     search_fields = ('email', 'first_name', 'last_name')
     list_filter = ('role', 'is_active', 'is_verified')
 

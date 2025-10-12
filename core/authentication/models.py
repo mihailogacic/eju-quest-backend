@@ -59,6 +59,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
     )
     profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
+    reward_points = models.PositiveIntegerField(default=0)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
