@@ -1,9 +1,5 @@
 """Models for custom user authentication and related activities."""
 
-import random
-import uuid
-from datetime import timedelta
-
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
 from django.db import models
@@ -62,6 +58,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     reward_points = models.PositiveIntegerField(default=0)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -95,15 +92,23 @@ class UserActivityLog(models.Model):
         ('logout', 'Logout'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='activity_logs',
+    )
     ip_address = models.GenericIPAddressField()
-    event_type = models.CharField(max_length=50, choices=EVENT_CHOICES)
-    event_time = models.DateTimeField(auto_now_add=True)
+    event_type = models.CharField(
+        max_length=50,
+        choices=EVENT_CHOICES,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(default=now, db_index=True)
 
     def __str__(self):
         """Return string representation of user activity log entry."""
         # pylint: disable=no-member
-        return f"{self.user.email} - {self.event_type} at {self.event_time}"
+        return f"{self.user.email} - {self.event_type} at {self.created_at}"
 
 
 class SecurityLog(models.Model):

@@ -20,7 +20,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     UserProfileSerializer
 )
-from .utils import log_security_event
+from .utils import log_security_event, log_failed_login_attempt
 
 User = get_user_model()
 
@@ -100,13 +100,10 @@ class LoginView(TokenObtainPairView):
             ip_address = request.META.get("REMOTE_ADDR")
             email = request.data.get("email", "")
             user = User.objects.filter(email=email).first()
-            log_security_event(
+            log_failed_login_attempt(
                 user=user,
                 email=email,
                 ip_address=ip_address,
-                event_type="failed_login",
-                event_description="Failed login attempt.",
-                failed_attempts=1
             )
             raise exc
 

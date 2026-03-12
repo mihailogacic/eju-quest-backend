@@ -3,7 +3,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Summary
+from .models import UserSummary
 
 User = get_user_model()
 
@@ -70,11 +70,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(str(exc))
 
 class SummarySerializer(serializers.ModelSerializer):
-    """Serializer for the Summary model with read-only creator details."""
+    """Serializer for the UserSummary model with read-only user details."""
 
-    creator = UserProfileSerializer(read_only=True)
+    user = UserProfileSerializer(read_only=True)
 
     class Meta:
         """Meta class for SummarySerializer."""
-        model = Summary
-        fields = ['id', 'description', 'creator']
+        model = UserSummary
+        fields = ['id', 'description', 'user']

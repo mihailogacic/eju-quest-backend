@@ -5,7 +5,7 @@ of data that comes to the backend from frontend.
 
 from rest_framework import serializers
 from core.exceptions import CustomValidationException
-from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonSummary, QuizResult
+from .models import Lesson, Section, Quiz, QuizQuestion, QuizQuestionOption, LessonSummary, QuizResult
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -91,17 +91,17 @@ class LessonSerializer(serializers.ModelSerializer):
 
 class SectionSerializer(serializers.ModelSerializer):
     """
-    Serializer for Sections model.
+    Serializer for Section model.
     """
     class Meta:
-        model = Sections
+        model = Section
         fields = ['heading', 'content']
 
 class LessonDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for Lesson model with related sections.
     """
-    sections = SectionSerializer(many=True, source='sections_set')
+    sections = SectionSerializer(many=True, source='section_set')
 
     class Meta:
         model = Lesson
@@ -109,23 +109,23 @@ class LessonDetailSerializer(serializers.ModelSerializer):
 
 class QuizQuestionOptionSerializer(serializers.ModelSerializer):
     """
-    Serializer for QuizQuestionOptions model.
+    Serializer for QuizQuestionOption model.
     """
 
     class Meta:
-        model = QuizQuestionOptions
+        model = QuizQuestionOption
         fields = ['id', 'option', 'option_text', 'correct']
 
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
     """
-    Serializer for QuizQuestions model.
+    Serializer for QuizQuestion model.
     """
     quiz = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all())
-    options = QuizQuestionOptionSerializer(many=True)
+    options = QuizQuestionOptionSerializer(many=True, read_only=True)
 
     class Meta:
-        model = QuizQuestions
+        model = QuizQuestion
         fields = ['id', 'quiz', 'question_text', 'options']
 
 
@@ -138,7 +138,7 @@ class QuizSerializer(serializers.ModelSerializer):
         queryset=Lesson.objects.all(), write_only=True
     )
     lesson_detail = LessonSerializer(source='lesson', read_only=True)
-    questions = QuizQuestionSerializer(many=True, read_only=True, source='quizquestions_set')
+    questions = QuizQuestionSerializer(many=True, read_only=True, source='quizquestion_set')
 
     class Meta:
         model = Quiz
@@ -188,8 +188,8 @@ class LessonSummarySerializer(serializers.ModelSerializer):
 class CompletedLessonSerializer(serializers.ModelSerializer):
     child_username = serializers.SerializerMethodField()
     child_id = serializers.IntegerField(source="user.id")
-    id = serializers.IntegerField(source="lesson.id")
-    title = serializers.CharField(source="lesson.title")
+    id = serializers.IntegerField(source="quiz.lesson.id")
+    title = serializers.CharField(source="quiz.lesson.title")
     lesson_image = serializers.SerializerMethodField()
     completed_at = serializers.DateTimeField(source="created_at")
 
@@ -207,7 +207,7 @@ class CompletedLessonSerializer(serializers.ModelSerializer):
 
     def get_lesson_image(self, obj):
         request = self.context.get("request")
-        img = obj.lesson.image
+        img = obj.quiz.lesson.image
         if img and hasattr(img, "url"):
             return request.build_absolute_uri(img.url)
         return None
@@ -219,7 +219,7 @@ class SingleQuizResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = QuizResult
-        exclude = ("lesson", "user", "updated_at")
+        exclude = ("user", "updated_at")
 
     def get_answers(self, obj):
         """
@@ -233,7 +233,7 @@ class SingleQuizResultSerializer(serializers.ModelSerializer):
             selected = entry["selected_option"]
             correct_flag = entry["correct"]
 
-            question = QuizQuestions.objects.get(pk=q_id)
+            question = QuizQuestion.objects.get(pk=q_id)
             q_data = QuizQuestionSerializer(question).data
 
             opts_dict = {opt["option"]: opt["option_text"] for opt in q_data["options"]}
@@ -256,7 +256,7 @@ class SingleQuizResultSerializer(serializers.ModelSerializer):
 
     def get_lesson_image(self, obj):
         request = self.context.get("request")
-        img = obj.lesson.image
+        img = obj.quiz.lesson.image
         if img and hasattr(img, "url"):
             return request.build_absolute_uri(img.url)
         return None

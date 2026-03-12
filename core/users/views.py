@@ -8,9 +8,9 @@ from rest_framework.response import Response
 from .serializers import (
     ChildRegistrationSerializer,
     UserProfileSerializer,
-    SummarySerializer
+    SummarySerializer,
 )
-from .models import Summary
+from .models import UserSummary
 
 User = get_user_model()
 
@@ -89,8 +89,8 @@ class ParentDashboardView(generics.GenericAPIView):
             users_serializer = UserProfileSerializer(users, many=True)
 
             # pylint: disable=no-member
-            summaries = Summary.objects.filter(
-                creator__parent=request.user
+            summaries = UserSummary.objects.filter(
+                user__parent=request.user
             )
             summaries_serializer = SummarySerializer(summaries, many=True)
 

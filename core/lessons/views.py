@@ -20,8 +20,24 @@ from celery.result import AsyncResult
 from authentication.models import User
 
 from .services import LessonServices
-from .serializers import LessonSerializer, LessonDetailSerializer, QuizSerializer, LessonSummarySerializer, SingleQuizResultSerializer, CompletedLessonSerializer
-from .models import Lesson, Sections, Quiz, QuizQuestions, QuizQuestionOptions, LessonVisit, QuizResult, LessonSummary
+from .serializers import (
+    LessonSerializer,
+    LessonDetailSerializer,
+    QuizSerializer,
+    LessonSummarySerializer,
+    SingleQuizResultSerializer,
+    CompletedLessonSerializer,
+)
+from .models import (
+    Lesson,
+    Section,
+    Quiz,
+    QuizQuestion,
+    QuizQuestionOption,
+    LessonVisit,
+    QuizResult,
+    LessonSummary,
+)
 from .tasks import generate_lesson_task
 
 logger = logging.getLogger(__name__)
@@ -139,7 +155,7 @@ class SaveLessonContentView(APIView):
             heading = section.get("heading", "")
             text = section.get("text", "")
             if heading and text:
-                Sections.objects.create(lesson=lesson, heading=heading, content=text)
+                Section.objects.create(lesson=lesson, heading=heading, content=text)
 
         # Create Quiz and Questions
         quiz = Quiz.objects.create(lesson=lesson)
@@ -148,24 +164,22 @@ class SaveLessonContentView(APIView):
             options_data = question_data.get("options", [])
             correct_answer = question_data.get("answer", "")
 
-            created_options = []
+            quiz_question = QuizQuestion.objects.create(
+                quiz=quiz,
+                question_text=question_text,
+            )
+
             for option_data in options_data:
                 option_letter = option_data.get("option")
                 option_text = option_data.get("text")
-                is_correct = (option_letter == correct_answer)
+                is_correct = option_letter == correct_answer
 
-                quiz_option = QuizQuestionOptions.objects.create(
+                QuizQuestionOption.objects.create(
+                    question=quiz_question,
                     option=option_letter,
                     option_text=option_text,
-                    correct=is_correct
+                    correct=is_correct,
                 )
-                created_options.append(quiz_option)
-
-            quiz_question = QuizQuestions.objects.create(
-                quiz=quiz,
-                question_text=question_text
-            )
-            quiz_question.options.set(created_options)
 
         return Response({"detail": "Lesson, sections, and quiz created successfully."}, status=status.HTTP_201_CREATED)
 
@@ -254,8 +268,8 @@ class LessonDeleteView(APIView):
             if lesson.image:
                 lesson.image.delete(save=False)
 
-            QuizQuestionOptions.objects.filter(
-                quizquestions__quiz__lesson=lesson
+            QuizQuestionOption.objects.filter(
+                question__quiz__lesson=lesson
             ).delete()
 
             lesson.delete()
@@ -355,7 +369,7 @@ class QuizAPI(APIView):
 
         quiz = get_object_or_404(Quiz, lesson_id=lesson_id)
 
-        total_quiz_questions = QuizQuestions.objects.filter(quiz=quiz).count()
+        total_quiz_questions = QuizQuestion.objects.filter(quiz=quiz).count()
 
         correct_count = 0
         processed_answers = 0
@@ -366,8 +380,8 @@ class QuizAPI(APIView):
             selected_option = answer.get("selected_option")
 
             try:
-                question = QuizQuestions.objects.get(id=q_id, quiz=quiz)
-            except QuizQuestions.DoesNotExist:
+                question = QuizQuestion.objects.get(id=q_id, quiz=quiz)
+            except QuizQuestion.DoesNotExist:
                 continue
 
             correct_option = question.options.filter(correct=True).first()
@@ -391,7 +405,7 @@ class QuizAPI(APIView):
         new_points = score_percent if eligible_now else 0
 
         try:
-            existing = QuizResult.objects.get(user=request.user, lesson_id=lesson_id)
+            existing = QuizResult.objects.get(user=request.user, quiz=quiz)
             prev_percent = round((existing.correct_answers / total_quiz_questions) * 100) if total_quiz_questions > 0 else 0
             prev_answered_enough = existing.total_questions > (total_quiz_questions / 2)
             prev_eligible = prev_answered_enough and (existing.remaining_time > 0)
@@ -405,7 +419,7 @@ class QuizAPI(APIView):
         with transaction.atomic():
             QuizResult.objects.update_or_create(
                 user=request.user,
-                lesson_id=lesson_id,
+                quiz=quiz,
                 defaults={
                     "score": score_percent,
                     "correct_answers": correct_count,
@@ -442,10 +456,12 @@ class CompletedLessonsView(APIView):
 
     def get(self, request):
         children = User.objects.filter(parent=request.user)
-        results = (QuizResult.objects
-                    .filter(user__in=children)
-                    .select_related("lesson", "user")
-                    .order_by("-created_at"))
+        results = (
+            QuizResult.objects
+            .filter(user__in=children)
+            .select_related("quiz__lesson", "user")
+            .order_by("-created_at")
+        )
 
         serializer = CompletedLessonSerializer(
             results,
@@ -474,7 +490,11 @@ class LessonResultsView(APIView):
             return Response({"detail": "Forbidden."},
                             status=status.HTTP_403_FORBIDDEN)
 
-        result = get_object_or_404(QuizResult, lesson=lesson, user=child)
+        result = get_object_or_404(
+            QuizResult,
+            quiz__lesson=lesson,
+            user=child,
+        )
 
         res_ser = SingleQuizResultSerializer(
             result,
