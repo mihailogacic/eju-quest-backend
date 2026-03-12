@@ -19,9 +19,9 @@ urlpatterns = [
      path('add-questions/', views.SaveLessonContentView.as_view(), name='save-lesson'),
 
      # quiz
-     path('submit-quiz/', views.QuizAPI.as_view(), name='quiz-submit'),
      path('quiz/<int:lesson>/', views.QuizAPI.as_view(), name='quiz-detail'),
-     
+     path('submit-quiz/', views.QuizAPI.as_view(), name='quiz-submit'),
+
      #results
      path('completed-lessons/', views.CompletedLessonsView.as_view(), name='completed-lessons'),
      path('<int:lesson_id>/results/', views.LessonResultsView.as_view(), name='lesson-results'),

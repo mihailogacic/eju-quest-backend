@@ -102,26 +102,6 @@ class ParentDashboardView(generics.GenericAPIView):
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-
-class UserSearchView(generics.ListAPIView):
-    """Allows searching for users by first name, last name, or email."""
-
-    serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        """Filter users by search term if provided."""
-        queryset = User.objects.all()
-        search_term = self.request.query_params.get('search')
-        if search_term:
-            queryset = queryset.filter(
-                Q(first_name__icontains=search_term)
-                | Q(last_name__icontains=search_term)
-                | Q(email__icontains=search_term)
-            )
-        return queryset
-
-
 class ChildDeactivateView(generics.DestroyAPIView):
     """Allows a parent to soft-delete (deactivate) a child account."""
 
@@ -141,7 +121,7 @@ class ChildDeactivateView(generics.DestroyAPIView):
         """Deactivate the specified child account via soft delete."""
         try:
             instance = self.get_object()
-            instance.delete_user()  # Use the soft delete method from the model.
+            instance.delete_user()
             return Response(
                 {"detail": "Child account deactivated successfully."},
                 status=status.HTTP_200_OK

@@ -1,6 +1,7 @@
 /venv
 /.env
 /core/staticfiles
+google-credentials.json
 /core/google-credentials.json
 
 
